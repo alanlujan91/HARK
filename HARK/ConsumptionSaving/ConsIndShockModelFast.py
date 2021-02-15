@@ -1,13 +1,13 @@
 """
 Classes to solve canonical consumption-savings models with idiosyncratic shocks
-to income.  All models here assume CRRA utility with geometric discounting, no
-bequest motive, and income shocks are fully transitory or fully permanent.
+to income faster.  All models here assume CRRA utility with geometric discounting,
+no bequest motive, and income shocks are fully transitory or fully permanent.
 
-It currently solves three types of models:
+It currently solves two types of models:
    1) A very basic "perfect foresight" consumption-savings model with no uncertainty.
    2) A consumption-savings model with risk over transitory and permanent income shocks.
-   3) The model described in (2), with an interest rate for debt that differs
-      from the interest rate for savings. #todo
+   3) (TODO) The model described in (2), with an interest rate for debt that differs
+      from the interest rate for savings.
 
 See NARK https://HARK.githhub.io/Documentation/NARK for information on variable naming conventions.
 See HARK documentation for mathematical descriptions of the models being solved.
@@ -34,7 +34,7 @@ from HARK.interpolation import (
     CubicInterp,
     ValueFuncCRRA,
     MargValueFuncCRRA,
-    MargMargValueFuncCRRA
+    MargMargValueFuncCRRA,
 )
 from HARK.numba import (
     CRRAutility,
@@ -46,6 +46,8 @@ from HARK.numba import (
     CRRAutilityP_invP,
 )
 from HARK.numba import LinearInterpFast, CubicInterpFast, LinearInterpDerivFast
+
+# todo check if this __all__ is correct
 
 __all__ = [
     "PerfForesightSolution",
@@ -69,6 +71,9 @@ utilityP_invP = CRRAutilityP_invP
 # =====================================================================
 # === Classes that help solve consumption-saving models ===
 # =====================================================================
+
+# todo try to compile this into one CosnumerSolution
+# todo Consumer solution can also be jitclass? What would be required?
 
 
 class PerfForesightSolution(MetricObject):
@@ -189,44 +194,67 @@ class IndShockSolution(MetricObject):
 # =====================================================================
 
 
-@njit(cache=True)
-def _searchSSfunc(m, Rfree, PermGroFac, mNrm, cNrm, ExIncNext):
-    # Make a linear function of all combinations of c and m that yield mNext = mNow
-    mZeroChange = (1.0 - PermGroFac / Rfree) * m + (PermGroFac / Rfree) * ExIncNext
-
-    # Find the steady state level of market resources
-    res = interp(mNrm, cNrm, m) - mZeroChange
-    # A zero of this is SS market resources
-    return res
-
-
-# @njit(cache=True) can't cache because of use of globals, perhaps newton_secant?
-@njit
-def _addSSmNrmNumba(Rfree, PermGroFac, mNrm, cNrm, mNrmMin, ExIncNext, _searchSSfunc):
+class ConsPerfForesightSolverFast(ConsPerfForesightSolver):
     """
-    Finds steady state (normalized) market resources and adds it to the
-    solution.  This is the level of market resources such that the expectation
-    of market resources in the next period is unchanged.  This value doesn't
-    necessarily exist.
+    A class for solving a one period perfect foresight consumption-saving problem.
+    An instance of this class is created by the function solvePerfForesight in each period.
     """
 
-    # Minimum market resources plus next income is okay starting guess
-    m_init_guess = mNrmMin + ExIncNext
+    def solve(self):
+        """
+        Solves the one period perfect foresight consumption-saving problem.
 
-    mNrmSS = newton_secant(
-        _searchSSfunc,
-        m_init_guess,
-        args=(Rfree, PermGroFac, mNrm, cNrm, ExIncNext),
-        disp=False,
-    )
+        Parameters
+        ----------
+        None
 
-    if mNrmSS.converged:
-        return mNrmSS.root
-    else:
-        return None
+        Returns
+        -------
+        solution : PerfForesightSolution
+            The solution to this period's problem.
+        """
+
+        # Use a local value of BoroCnstArt to prevent comparing None and float below.
+        if self.BoroCnstArt is None:
+            BoroCnstArt = -np.inf
+        else:
+            BoroCnstArt = self.BoroCnstArt
+
+        (
+            self.mNrmNow,
+            self.cNrmNow,
+            self.vFuncNvrsSlope,
+            self.mNrmMinNow,
+            self.hNrmNow,
+            self.MPCmin,
+            self.MPCmax,
+        ) = _solveConsPerfForesightNumba(
+            self.DiscFac,
+            self.LivPrb,
+            self.CRRA,
+            self.Rfree,
+            self.PermGroFac,
+            BoroCnstArt,
+            self.MaxKinks,
+            self.solution_next.mNrm,
+            self.solution_next.cNrm,
+            self.solution_next.hNrm,
+            self.solution_next.MPCmin,
+        )
+
+        solution = PerfForesightSolution(
+            mNrm=self.mNrmNow,
+            cNrm=self.cNrmNow,
+            vFuncNvrsSlope=self.vFuncNvrsSlope,
+            mNrmMin=self.mNrmMinNow,
+            hNrm=self.hNrmNow,
+            MPCmin=self.MPCmin,
+            MPCmax=self.MPCmax,
+        )
+        return solution
 
 
-@njit(cache=True)
+@njit(cache=True, parallel=True)
 def _solveConsPerfForesightNumba(
     DiscFac,
     LivPrb,
@@ -332,63 +360,149 @@ def _solveConsPerfForesightNumba(
     )
 
 
-class ConsPerfForesightSolverFast(ConsPerfForesightSolver):
+@njit(cache=True)
+def _searchSSfunc(m, Rfree, PermGroFac, mNrm, cNrm, ExIncNext):
+    # Make a linear function of all combinations of c and m that yield mNext = mNow
+    mZeroChange = (1.0 - PermGroFac / Rfree) * m + (PermGroFac / Rfree) * ExIncNext
+
+    # Find the steady state level of market resources
+    res = interp(mNrm, cNrm, m) - mZeroChange
+    # A zero of this is SS market resources
+    return res
+
+
+# @njit(cache=True) can't cache because of use of globals, perhaps newton_secant?
+@njit
+def _addSSmNrmNumba(Rfree, PermGroFac, mNrm, cNrm, mNrmMin, ExIncNext, _searchSSfunc):
     """
-    A class for solving a one period perfect foresight consumption-saving problem.
-    An instance of this class is created by the function solvePerfForesight in each period.
+    Finds steady state (normalized) market resources and adds it to the
+    solution.  This is the level of market resources such that the expectation
+    of market resources in the next period is unchanged.  This value doesn't
+    necessarily exist.
     """
 
-    def solve(self):
+    # Minimum market resources plus next income is okay starting guess
+    m_init_guess = mNrmMin + ExIncNext
+
+    mNrmSS = newton_secant(
+        _searchSSfunc,
+        m_init_guess,
+        args=(Rfree, PermGroFac, mNrm, cNrm, ExIncNext),
+        disp=False,
+    )
+
+    if mNrmSS.converged:
+        return mNrmSS.root
+    else:
+        return None
+
+
+###############################################################################
+###############################################################################
+
+
+class ConsIndShockSolverBasicFast(ConsIndShockSolverBasic):
+    """
+    This class solves a single period of a standard consumption-saving problem,
+    using linear interpolation and without the ability to calculate the value
+    function.  ConsIndShockSolver inherits from this class and adds the ability
+    to perform cubic interpolation and to calculate the value function.
+
+    Note that this class does not have its own initializing method.  It initial-
+    izes the same problem in the same way as ConsIndShockSetup, from which it
+    inherits.
+    """
+
+    def prepareToSolve(self):
         """
-        Solves the one period perfect foresight consumption-saving problem.
-
+        Perform preparatory work before calculating the unconstrained consumption
+        function.
         Parameters
         ----------
-        None
-
+        none
         Returns
         -------
-        solution : PerfForesightSolution
-            The solution to this period's problem.
+        none
         """
 
-        # Use a local value of BoroCnstArt to prevent comparing None and float below.
-        if self.BoroCnstArt is None:
-            BoroCnstArt = -np.inf
-        else:
-            BoroCnstArt = self.BoroCnstArt
+        self.ShkPrbsNext = self.IncShkDstn.pmf
+        self.PermShkValsNext = self.IncShkDstn.X[0]
+        self.TranShkValsNext = self.IncShkDstn.X[1]
 
         (
-            self.mNrmNow,
-            self.cNrmNow,
-            self.vFuncNvrsSlope,
+            self.DiscFacEff,
+            self.BoroCnstNat,
+            self.cFuncLimitIntercept,
+            self.cFuncLimitSlope,
             self.mNrmMinNow,
             self.hNrmNow,
-            self.MPCmin,
-            self.MPCmax,
-        ) = _solveConsPerfForesightNumba(
+            self.MPCminNow,
+            self.MPCmaxNow,
+            self.MPCmaxEff,
+            self.ExIncNext,
+            self.mNrmNext,
+            self.PermShkVals_temp,
+            self.ShkPrbs_temp,
+            self.aNrmNow,
+        ) = _prepareToSolveConsIndShockNumba(
             self.DiscFac,
             self.LivPrb,
             self.CRRA,
             self.Rfree,
             self.PermGroFac,
-            BoroCnstArt,
-            self.MaxKinks,
-            self.solution_next.mNrm,
-            self.solution_next.cNrm,
+            self.BoroCnstArt,
+            self.aXtraGrid,
             self.solution_next.hNrm,
+            self.solution_next.mNrmMin,
             self.solution_next.MPCmin,
+            self.solution_next.MPCmax,
+            self.PermShkValsNext,
+            self.TranShkValsNext,
+            self.ShkPrbsNext,
         )
 
-        solution = PerfForesightSolution(
-            self.mNrmNow,
-            self.cNrmNow,
-            self.vFuncNvrsSlope,
+    def solve(self):
+        """
+        Solves a one period consumption saving problem with risky income.
+        Parameters
+        ----------
+        None
+        Returns
+        -------
+        solution : ConsumerSolution
+            The solution to the one period problem.
+        """
+
+        self.cNrm, self.mNrm, self.EndOfPrdvP = _solveConsIndShockLinearNumba(
+            self.solution_next.mNrmMin,
+            self.mNrmNext,
+            self.CRRA,
+            self.solution_next.mNrm,
+            self.solution_next.cNrm,
+            self.DiscFacEff,
+            self.Rfree,
+            self.PermGroFac,
+            self.PermShkVals_temp,
+            self.ShkPrbs_temp,
+            self.aNrmNow,
+            self.BoroCnstNat,
+            self.solution_next.cFuncLimitIntercept,
+            self.solution_next.cFuncLimitSlope,
+        )
+
+        # Pack up the solution and return it
+        solution = IndShockSolution(
+            self.mNrm,
+            self.cNrm,
+            self.cFuncLimitIntercept,
+            self.cFuncLimitSlope,
             self.mNrmMinNow,
             self.hNrmNow,
-            self.MPCmin,
-            self.MPCmax,
+            self.MPCminNow,
+            self.MPCmaxEff,
+            self.ExIncNext,
         )
+
         return solution
 
 
@@ -561,65 +675,16 @@ def _solveConsIndShockLinearNumba(
     return (cNrm, mNrm, EndOfPrdvP)
 
 
-class ConsIndShockSolverBasicFast(ConsIndShockSolverBasic):
+###############################################################################
+###############################################################################
+
+
+class ConsIndShockSolverFast(ConsIndShockSolverBasicFast):
     """
-    This class solves a single period of a standard consumption-saving problem,
-    using linear interpolation and without the ability to calculate the value
-    function.  ConsIndShockSolver inherits from this class and adds the ability
-    to perform cubic interpolation and to calculate the value function.
-
-    Note that this class does not have its own initializing method.  It initial-
-    izes the same problem in the same way as ConsIndShockSetup, from which it
-    inherits.
+    This class solves a single period of a standard consumption-saving problem.
+    It inherits from ConsIndShockSolverBasic, adding the ability to perform cubic
+    interpolation and to calculate the value function.
     """
-
-    def prepareToSolve(self):
-        """
-        Perform preparatory work before calculating the unconstrained consumption
-        function.
-        Parameters
-        ----------
-        none
-        Returns
-        -------
-        none
-        """
-
-        self.ShkPrbsNext = self.IncShkDstn.pmf
-        self.PermShkValsNext = self.IncShkDstn.X[0]
-        self.TranShkValsNext = self.IncShkDstn.X[1]
-
-        (
-            self.DiscFacEff,
-            self.BoroCnstNat,
-            self.cFuncLimitIntercept,
-            self.cFuncLimitSlope,
-            self.mNrmMinNow,
-            self.hNrmNow,
-            self.MPCminNow,
-            self.MPCmaxNow,
-            self.MPCmaxEff,
-            self.ExIncNext,
-            self.mNrmNext,
-            self.PermShkVals_temp,
-            self.ShkPrbs_temp,
-            self.aNrmNow,
-        ) = _prepareToSolveConsIndShockNumba(
-            self.DiscFac,
-            self.LivPrb,
-            self.CRRA,
-            self.Rfree,
-            self.PermGroFac,
-            self.BoroCnstArt,
-            self.aXtraGrid,
-            self.solution_next.hNrm,
-            self.solution_next.mNrmMin,
-            self.solution_next.MPCmin,
-            self.solution_next.MPCmax,
-            self.PermShkValsNext,
-            self.TranShkValsNext,
-            self.ShkPrbsNext,
-        )
 
     def solve(self):
         """
@@ -633,35 +698,124 @@ class ConsIndShockSolverBasicFast(ConsIndShockSolverBasic):
             The solution to the one period problem.
         """
 
-        self.cNrm, self.mNrm, self.EndOfPrdvP = _solveConsIndShockLinearNumba(
-            self.solution_next.mNrmMin,
-            self.mNrmNext,
-            self.CRRA,
-            self.solution_next.mNrm,
-            self.solution_next.cNrm,
-            self.DiscFacEff,
-            self.Rfree,
-            self.PermGroFac,
-            self.PermShkVals_temp,
-            self.ShkPrbs_temp,
-            self.aNrmNow,
-            self.BoroCnstNat,
-            self.solution_next.cFuncLimitIntercept,
-            self.solution_next.cFuncLimitSlope,
-        )
+        if self.CubicBool:
+            (
+                self.cNrm,
+                self.mNrm,
+                self.MPC,
+                self.EndOfPrdvP,
+            ) = _solveConsIndShockCubicNumba(
+                self.solution_next.mNrmMin,
+                self.mNrmNext,
+                self.solution_next.mNrm,
+                self.solution_next.cNrm,
+                self.solution_next.MPC,
+                self.solution_next.cFuncLimitIntercept,
+                self.solution_next.cFuncLimitSlope,
+                self.CRRA,
+                self.DiscFacEff,
+                self.Rfree,
+                self.PermGroFac,
+                self.PermShkVals_temp,
+                self.ShkPrbs_temp,
+                self.aNrmNow,
+                self.BoroCnstNat,
+                self.MPCmaxNow,
+            )
+            # Pack up the solution and return it
+            solution = IndShockSolution(
+                self.mNrm,
+                self.cNrm,
+                self.cFuncLimitIntercept,
+                self.cFuncLimitSlope,
+                self.mNrmMinNow,
+                self.hNrmNow,
+                self.MPCminNow,
+                self.MPCmaxEff,
+                self.ExIncNext,
+                self.MPC,
+            )
+        else:
+            self.cNrm, self.mNrm, self.EndOfPrdvP = _solveConsIndShockLinearNumba(
+                self.solution_next.mNrmMin,
+                self.mNrmNext,
+                self.CRRA,
+                self.solution_next.mNrm,
+                self.solution_next.cNrm,
+                self.DiscFacEff,
+                self.Rfree,
+                self.PermGroFac,
+                self.PermShkVals_temp,
+                self.ShkPrbs_temp,
+                self.aNrmNow,
+                self.BoroCnstNat,
+                self.solution_next.cFuncLimitIntercept,
+                self.solution_next.cFuncLimitSlope,
+            )
 
-        # Pack up the solution and return it
-        solution = IndShockSolution(
-            self.mNrm,
-            self.cNrm,
-            self.cFuncLimitIntercept,
-            self.cFuncLimitSlope,
-            self.mNrmMinNow,
-            self.hNrmNow,
-            self.MPCminNow,
-            self.MPCmaxEff,
-            self.ExIncNext,
-        )
+            # Pack up the solution and return it
+            solution = IndShockSolution(
+                self.mNrm,
+                self.cNrm,
+                self.cFuncLimitIntercept,
+                self.cFuncLimitSlope,
+                self.mNrmMinNow,
+                self.hNrmNow,
+                self.MPCminNow,
+                self.MPCmaxEff,
+                self.ExIncNext,
+            )
+
+        if self.vFuncBool:
+
+            if self.CubicBool:
+                self.cFuncNow, self.mNrmGrid = _cFuncCubic(
+                    self.aXtraGrid,
+                    self.mNrmMinNow,
+                    self.mNrm,
+                    self.cNrm,
+                    self.MPC,
+                    self.MPCminNow,
+                    self.hNrmNow,
+                )
+            else:
+                self.cFuncNow, self.mNrmGrid = _cFuncLinear(
+                    self.aXtraGrid,
+                    self.mNrmMinNow,
+                    self.mNrm,
+                    self.cNrm,
+                    self.MPCminNow,
+                    self.hNrmNow,
+                )
+
+            self.mNrmGrid, self.vNvrs, self.vNvrsP, self.MPCminNvrs = _addvFuncNumba(
+                self.mNrmNext,
+                self.solution_next.mNrmGrid,
+                self.solution_next.vNvrs,
+                self.solution_next.vNvrsP,
+                self.solution_next.MPCminNvrs,
+                self.solution_next.hNrm,
+                self.CRRA,
+                self.PermShkVals_temp,
+                self.PermGroFac,
+                self.DiscFacEff,
+                self.ShkPrbs_temp,
+                self.EndOfPrdvP,
+                self.aNrmNow,
+                self.BoroCnstNat,
+                self.mNrmGrid,
+                self.cFuncNow,
+                self.mNrmMinNow,
+                self.MPCmaxEff,
+                self.MPCminNow,
+            )
+
+            # Pack up the solution and return it
+
+            solution.mNrmGrid = self.mNrmGrid
+            solution.vNvrs = self.vNvrs
+            solution.vNvrsP = self.vNvrsP
+            solution.MPCminNvrs = self.MPCminNvrs
 
         return solution
 
@@ -924,147 +1078,6 @@ def _searchSSfuncCubic(
     res = cNrmNow[0] - mZeroChange
     # A zero of this is SS market resources
     return res
-
-
-class ConsIndShockSolverFast(ConsIndShockSolverBasicFast):
-    """
-    This class solves a single period of a standard consumption-saving problem.
-    It inherits from ConsIndShockSolverBasic, adding the ability to perform cubic
-    interpolation and to calculate the value function.
-    """
-
-    def solve(self):
-        """
-        Solves a one period consumption saving problem with risky income.
-        Parameters
-        ----------
-        None
-        Returns
-        -------
-        solution : ConsumerSolution
-            The solution to the one period problem.
-        """
-
-        if self.CubicBool:
-            (
-                self.cNrm,
-                self.mNrm,
-                self.MPC,
-                self.EndOfPrdvP,
-            ) = _solveConsIndShockCubicNumba(
-                self.solution_next.mNrmMin,
-                self.mNrmNext,
-                self.solution_next.mNrm,
-                self.solution_next.cNrm,
-                self.solution_next.MPC,
-                self.solution_next.cFuncLimitIntercept,
-                self.solution_next.cFuncLimitSlope,
-                self.CRRA,
-                self.DiscFacEff,
-                self.Rfree,
-                self.PermGroFac,
-                self.PermShkVals_temp,
-                self.ShkPrbs_temp,
-                self.aNrmNow,
-                self.BoroCnstNat,
-                self.MPCmaxNow,
-            )
-            # Pack up the solution and return it
-            solution = IndShockSolution(
-                self.mNrm,
-                self.cNrm,
-                self.cFuncLimitIntercept,
-                self.cFuncLimitSlope,
-                self.mNrmMinNow,
-                self.hNrmNow,
-                self.MPCminNow,
-                self.MPCmaxEff,
-                self.ExIncNext,
-                self.MPC,
-            )
-        else:
-            self.cNrm, self.mNrm, self.EndOfPrdvP = _solveConsIndShockLinearNumba(
-                self.solution_next.mNrmMin,
-                self.mNrmNext,
-                self.CRRA,
-                self.solution_next.mNrm,
-                self.solution_next.cNrm,
-                self.DiscFacEff,
-                self.Rfree,
-                self.PermGroFac,
-                self.PermShkVals_temp,
-                self.ShkPrbs_temp,
-                self.aNrmNow,
-                self.BoroCnstNat,
-                self.solution_next.cFuncLimitIntercept,
-                self.solution_next.cFuncLimitSlope,
-            )
-
-            # Pack up the solution and return it
-            solution = IndShockSolution(
-                self.mNrm,
-                self.cNrm,
-                self.cFuncLimitIntercept,
-                self.cFuncLimitSlope,
-                self.mNrmMinNow,
-                self.hNrmNow,
-                self.MPCminNow,
-                self.MPCmaxEff,
-                self.ExIncNext,
-            )
-
-        if self.vFuncBool:
-
-            if self.CubicBool:
-                self.cFuncNow, self.mNrmGrid = _cFuncCubic(
-                    self.aXtraGrid,
-                    self.mNrmMinNow,
-                    self.mNrm,
-                    self.cNrm,
-                    self.MPC,
-                    self.MPCminNow,
-                    self.hNrmNow,
-                )
-            else:
-                self.cFuncNow, self.mNrmGrid = _cFuncLinear(
-                    self.aXtraGrid,
-                    self.mNrmMinNow,
-                    self.mNrm,
-                    self.cNrm,
-                    self.MPCminNow,
-                    self.hNrmNow,
-                )
-
-            self.mNrmGrid, self.vNvrs, self.vNvrsP, self.MPCminNvrs = _addvFuncNumba(
-                self.mNrmNext,
-                self.solution_next.mNrmGrid,
-                self.solution_next.vNvrs,
-                self.solution_next.vNvrsP,
-                self.solution_next.MPCminNvrs,
-                self.solution_next.hNrm,
-                self.CRRA,
-                self.PermShkVals_temp,
-                self.PermGroFac,
-                self.DiscFacEff,
-                self.ShkPrbs_temp,
-                self.EndOfPrdvP,
-                self.aNrmNow,
-                self.BoroCnstNat,
-                self.mNrmGrid,
-                self.cFuncNow,
-                self.mNrmMinNow,
-                self.MPCmaxEff,
-                self.MPCminNow,
-            )
-
-            # Pack up the solution and return it
-
-            solution.mNrmGrid = self.mNrmGrid
-            solution.vNvrs = self.vNvrs
-            solution.vNvrsP = self.vNvrsP
-            solution.MPCminNvrs = self.MPCminNvrs
-
-        return solution
 
 
 # ============================================================================
