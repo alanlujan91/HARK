@@ -167,9 +167,7 @@ class PortfolioConsumerType(RiskyAssetConsumerType):
         kwds = params
 
         # Initialize a basic consumer type
-        RiskyAssetConsumerType.__init__(
-            self, verbose=verbose, quiet=quiet, **kwds
-        )
+        RiskyAssetConsumerType.__init__(self, verbose=verbose, quiet=quiet, **kwds)
 
         # Set the solver for the portfolio model, and update various constructed attributes
         self.solve_one_period = solveConsPortfolio
@@ -919,7 +917,7 @@ def solveConsPortfolio(
                 CubicInterp(
                     np.insert(mNrm_temp[:, 0], 0, 0.0),  # x_list
                     np.insert(vNvrs_temp[:, j], 0, 0.0),  # f_list
-                    np.insert(vNvrsP_temp[:, j], 0, vNvrsP_temp[j, 0]),  # dfdx_list
+                    np.insert(vNvrsP_temp[:, j], 0, vNvrsP_temp[0, j]),  # dfdx_list
                 )
             )
         vNvrsFuncFxd = LinearInterpOnInterp1D(vNvrsFuncFxd_by_Share, ShareGrid)
