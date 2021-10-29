@@ -17,6 +17,7 @@ from HARK.interpolation import (
     TrilinearInterp,
     LinearInterp,
     BilinearInterp,
+    LinearInterpOnInterp1D,
 )
 from HARK.utilities import (
     CRRAutility,
@@ -443,6 +444,57 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
                     alpha = 1.0 - top_f / (top_f - bot_f)
                     self.shareSoln[i, j] = (1.0 - alpha) * bot_s + alpha * top_s
                     self.cNrmNow[i, j] = (1.0 - alpha) * bot_c + alpha * top_c
+
+    def dvdkNowFunc(self, shocks, a_nrm, k_nrm, share):
+
+        b_nrm = a_nrm * (1.0 - share)
+        i_nrm = a_nrm * share
+
+        b_nrm_next = self.b_nrm_next(shocks, b_nrm)
+        k_nrm_next = self.k_nrm_next(shocks, i_nrm, k_nrm)
+
+        return (
+            shocks[self.HumanShkIdx]
+            * self.kLvlNextFunc.derivativeK(i_nrm, k_nrm)
+            * self.dvdkFunc_intermed(b_nrm_next, k_nrm_next)
+        )
+
+    def make_basic_solution(self):
+        """
+        Given end of period assets and end of period marginal values, construct
+        the basic solution for this period.
+        """
+
+        aNrmNow, kNrmNow = np.meshgrid(self.aNrmGrid, self.kNrmGrid, indexing="ij")
+
+        # Calculate the endogenous mNrm gridpoints when the agent adjusts his portfolio
+        mNrmNow = aNrmNow + self.cNrmNow
+
+        dvdkNow = self.DiscFac * calc_expectation(
+            self.ShkDstn, self.dvdkNowFunc, aNrmNow, kNrmNow, self.shareSoln
+        )
+
+        cFunc_by_k = []
+        shareFunc_by_k = []
+        dvdk_by_k = []
+        for i in range(self.kNrmCount):
+            cFunc_by_k.append(
+                LinearInterp(
+                    np.insert(mNrmNow[:, i], 0, 0.0),
+                    np.insert(self.cNrmNow[:, i], 0, 0.0),
+                )
+            )
+
+            shareFunc_by_k.append(LinearInterp(mNrmNow[:, i], self.shareNow[:, i]))
+
+            dvdk_by_k.append(LinearInterp(mNrmNow[:, i], dvdkNow[:, i]))
+
+        self.cFuncNow = LinearInterpOnInterp1D(cFunc_by_k, self.kNrmGrid)
+
+        # Construct the marginal value (of mNrm) function when the agent can adjust
+        self.vPfuncNow = MargValueFuncCRRA(self.cFuncNow, self.CRRA)
+
+        self.dvdkFuncNow = LinearInterpOnInterp1D(dvdk_by_k, self.kNrmGrid)
 
 
 class ConsGenIncParentSolver(ConsGenIncProcessSolver):
