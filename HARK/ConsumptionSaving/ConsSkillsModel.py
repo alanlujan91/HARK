@@ -140,23 +140,37 @@ class ParentalSolution(MetricObject):
 
 
 class ParentConsumerType(GenIncProcessConsumerType):
-    pass
+    state_vars = GenIncProcessConsumerType.state_vars + ["kLvl"]
+
+    def __init__(self, verbose=False, quiet=False, **kwds):
+        params = init_parent.copy()
+        params.update(kwds)
+        kwds = params
+
+    def update_kLvlNextFunc(self):
+        self.kLvlNextFunc = HumanCapitalProductionFunctionCD(
+            self.TotlFactrProd, self.InvstShare, self.KaptlShare
+        )
+
+    def update_kLvlGrid(self):
+        pass
 
 
 class ConsNrmIncParentSolver(ConsIndShockSolver):
     """
     Solver class for ParentConsumerType when solution can be normalized by permanent income.
     """
+
     def __init__(
         self,
         solution_next,
         IncShkDstn,
-        RiskyDstn,
         ShkDstn,
         DiscFac,
         CRRA,
         Rfree,
         BoroCnstArt,
+        kNrmNextFunc,
         aXtraGrid,
         kNrmGrid,
         ShareGrid,
@@ -165,12 +179,12 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
     ):
         self.solution_next = solution_next
         self.IncShkDstn = IncShkDstn
-        self.RiskyDstn = RiskyDstn
         self.ShkDstn = ShkDstn
         self.DiscFac = DiscFac
         self.CRRA = CRRA
         self.Rfree = Rfree
         self.BoroCnstArt = BoroCnstArt
+        self.kNrmNextFunc = kNrmNextFunc
         self.aXtraGrid = aXtraGrid
         self.kNrmGrid = kNrmGrid
         self.ShareGrid = ShareGrid
@@ -219,19 +233,19 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         if self.vFuncBool:
             self.vFunc_next = self.solution_next.vFunc
 
+        self.PermShkIdx = 0
+        self.TranShkIdx = 1
+        self.RiskyShkIdx = 0
+        self.HumanShkIdx = 1
+
         # Unpack the shock distribution
-        TranShks = self.IncShkDstn.X[1]
-        RiskyShks = self.RiskyDstn.X
+        TranShks = self.IncShkDstn.X[self.TranShkIdx]
+        RiskyShks = self.ShkDstn.X[self.RiskyShkIdx]
 
         # Flag for whether the natural borrowing constraint is zero
         self.zero_bound = np.min(TranShks) == 0.0
         self.RiskyMax = np.max(RiskyShks)
         self.RiskyMin = np.min(RiskyShks)
-
-        self.PermShkIdx = 0
-        self.TranShkIdx = 1
-        self.RiskyShkIdx = 0
-        self.HumanShkIdx = 1
 
     def prepare_to_solve(self):
         """
@@ -261,22 +275,24 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
             self.bNrmGrid = self.RiskyMax * np.insert(self.aXtraGrid, 0, 0.0)
 
         # Get grid and shock sizes, for easier indexing
-        self.aNrmCount = self.aNrmGrid.size
+        self.aNrmCount = self.aNrmGrid.size  # same as bNrmGrid size
         self.kNrmCount = self.kNrmGrid.size
         self.ShareCount = self.ShareGrid.size
 
-        # Make tiled arrays to calculate future realizations of mNrm and Share when integrating over IncShkDstn
+        # Make tiled arrays to calculate future realizations of mNrm and kNrm when integrating over IncShkDstn
+        # shape of these is (aNrmCount, kNrmCount)
         self.bNrmNext, self.kNrmNext = np.meshgrid(
             self.bNrmGrid, self.kNrmGrid, indexing="ij"
         )
 
-        # Make tiled arrays to calculate future realizations of bNrm and Share when integrating over RiskyDstn
+        # Make tiled arrays to calculate future realizations of bNrm and kNrm when integrating over ShkDstn
+        # shape of these is (aNrmCount, kNrmCount, ShareCount)
         self.aNrmNow, self.kNrmNow, self.shareNow = np.meshgrid(
             self.aNrmGrid, self.kNrmGrid, self.ShareGrid, indexing="ij"
         )
 
         # for solution objects we only need arrays of shape (aNrmCount, kNrmCount)
-        # so we can remove the last dimension
+        # so we can remove the last dimension since share is a control not a state
         self.aNrmSoln = self.aNrmNow[:, :, 0]
         self.kNrmSoln = self.kNrmNow[:, :, 0]
 
@@ -304,7 +320,7 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
 
         return shocks[self.HumanShkIdx] * self.kNrmNextFunc(i_nrm, k_nrm)
 
-    def dvAltdbFunc(self, shocks, b_nrm_next, k_nrm_next):
+    def dvFrak_db_helper(self, shocks, b_nrm_next, k_nrm_next):
         """
         Evaluate realizations of marginal value of market resources next period
         """
@@ -314,7 +330,7 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
 
         return (shocks[self.PermShkIdx] * self.PermGroFac) ** (-self.CRRA) * dvdm
 
-    def dvAltdkFunc(self, shocks, b_nrm_next, k_nrm_next):
+    def dvFrak_dk_helper(self, shocks, b_nrm_next, k_nrm_next):
         """
         Evaluate realizations of marginal value of risky share next period
         """
@@ -324,7 +340,7 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
 
         return (shocks[self.PermShkIdx] * self.PermGroFac) ** (-self.CRRA) * dvdk
 
-    def EndOfPrddvdaFunc(self, shocks, a_nrm, k_nrm, share):
+    def EndOfPrddvda_helper(self, shocks, a_nrm, k_nrm, share):
 
         b_nrm = a_nrm * (1.0 - share)
         i_nrm = a_nrm * share
@@ -335,19 +351,19 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         partial_b = (
             shocks[self.RiskyShkIdx]
             * (1.0 - share)
-            * self.dvdbFunc_intermed(b_nrm_next, k_nrm_next)
+            * self.dvFrak_dbFunc(b_nrm_next, k_nrm_next)
         )
 
         partial_k = (
             shocks[self.HumanShkIdx]
             * share
             * self.kLvlNextFunc.derivativeI(i_nrm, k_nrm)
-            * self.dvdkFunc_intermed(b_nrm_next, k_nrm_next)
+            * self.dvFrak_dkFunc(b_nrm_next, k_nrm_next)
         )
 
         return partial_b + partial_k
 
-    def EndOfPrddvdsFunc(self, shocks, a_nrm, k_nrm, share):
+    def EndOfPrddvds_helper(self, shocks, a_nrm, k_nrm, share):
 
         b_nrm = a_nrm * (1.0 - share)
         i_nrm = a_nrm * share
@@ -355,14 +371,14 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         b_nrm_next = self.b_nrm_next(shocks, b_nrm)
         k_nrm_next = self.k_nrm_next(shocks, i_nrm, k_nrm)
 
-        partial_b = shocks[self.RiskyShkIdx] * self.dvdbFunc_intermed(
+        partial_b = shocks[self.RiskyShkIdx] * self.dvFrak_dbFunc(
             b_nrm_next, k_nrm_next
         )
 
         partial_k = (
             shocks[self.HumanShkIdx]
             * self.kLvlNextFunc.derivativeI(i_nrm, k_nrm)
-            * self.dvdkFunc_intermed(b_nrm_next, k_nrm_next)
+            * self.dvFrak_dkFunc(b_nrm_next, k_nrm_next)
         )
 
         return partial_b + partial_k
@@ -375,33 +391,31 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         """
 
         # Calculate intermediate marginal value of bank balances by taking expectations over income shocks
-        dvdb_intermed = calc_expectation(
-            self.IncShkDstn, self.dvAltdbFunc, self.bNrmNext, self.kNrmNext
+        dvFrak_db = calc_expectation(
+            self.IncShkDstn, self.dvFrak_db_helper, self.bNrmNext, self.kNrmNext
         )
 
-        dvdb_intermed = dvdb_intermed[:, :, 0]
-        dvdbNvrs_intermed = self.uPinv(dvdb_intermed)
-        dvdbNvrsFunc_intermed = BilinearInterp(
-            dvdbNvrs_intermed, self.bNrmGrid, self.kNrmGrid
-        )
-        self.dvdbFunc_intermed = MargValueFuncCRRA(dvdbNvrsFunc_intermed, self.CRRA)
+        dvFrak_db = dvFrak_db[:, :, 0]
+        dvFrak_dbNvrs = self.uPinv(dvFrak_db)
+        dvFrak_dbNvrsFunc = BilinearInterp(dvFrak_dbNvrs, self.bNrmGrid, self.kNrmGrid)
+        self.dvFrak_dbFunc = MargValueFuncCRRA(dvFrak_dbNvrsFunc, self.CRRA)
 
         # Calculate intermediate marginal value of risky portfolio share by taking expectations
-        dvdk_intermed = calc_expectation(
-            self.IncShkDstn, self.dvAltdkFunc, self.bNrmNext, self.kNrmNext
+        dvFrak_dk = calc_expectation(
+            self.IncShkDstn, self.dvFrak_dk_helper, self.bNrmNext, self.kNrmNext
         )
 
-        dvdk_intermed = dvdk_intermed[:, :, 0]
-        self.dvdkFunc_intermed = BilinearInterp(
-            dvdk_intermed, self.bNrmGrid, self.kNrmGrid
-        )
+        dvFrak_dk = dvFrak_dk[:, :, 0]
+        dvFrak_dkNvrs = self.uPinv(dvFrak_dk)
+        dvFrak_dkFunc = BilinearInterp(dvFrak_dkNvrs, self.bNrmGrid, self.kNrmGrid)
+        self.dvFrak_dkFunc = MargValueFuncCRRA(dvFrak_dkFunc, self.CRRA)
 
         # Evaluate realizations of value and marginal value after asset returns are realized
 
         # Calculate end-of-period marginal value of assets by taking expectations
         self.EndOfPrddvda = self.DiscFac * calc_expectation(
             self.ShkDstn,  # includes RiskyShk and HumanShk
-            self.EndOfPrddvdaFunc,  # constructed from intermed marginal value funcs
+            self.EndOfPrddvda_helper,  # constructed from intermed marginal value funcs
             self.aNrmNow,  # exogenous grid
             self.kNrmNow,  # grid of human capital
             self.shareNow,  # discrete shares
@@ -413,7 +427,7 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         # Calculate end-of-period marginal value of risky portfolio share by taking expectations
         self.EndOfPrddvds = calc_expectation(
             self.ShkDstn,
-            self.EndOfPrddvdsFunc,
+            self.EndOfPrddvds_helper,
             self.aNrmNow,
             self.kNrmNow,
             self.shareNow,
@@ -427,8 +441,8 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         """
 
         # Initialize to putting everything in safe asset
-        self.shareSoln = np.zeros((self.aNrmCount, self.kNrmCount))
-        self.cNrmNow = np.zeros((self.aNrmCount, self.kNrmCount))
+        self.shareSoln = np.zeros_like(self.aNrmSoln)
+        self.cNrmSoln = np.zeros_like(self.aNrmSoln)
 
         # For values of aNrm at which the agent wants to put more than 100% into risky asset, constrain them
         FOCs = self.EndOfPrddvds
@@ -441,16 +455,20 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         if not self.zero_bound:
             # aNrm=0, so there's no way to "optimize" the portfolio
             self.shareSoln[0] = 1.0
-            # Consumption when aNrm=0 does not depend on Share
-            self.cNrmNow[0] = self.EndOfPrddvdaNvrs[0, :, -1]
+            # Consumption when aNrm=0 does not depend on Share; pick any?
+            self.cNrmSoln[0] = self.EndOfPrddvdaNvrs[0, :, -1]
             # Mark as constrained so that there is no attempt at optimization
             constrained_top[0] = True
 
         # Get consumption when share-constrained
-        self.cNrmNow[constrained_top] = self.cEGM[constrained_top, -1]
-        self.cNrmNow[constrained_bot] = self.cEGM[constrained_bot, 0]
+        self.cNrmSoln[constrained_top] = self.cEGM[constrained_top, -1]
+        self.cNrmSoln[constrained_bot] = self.cEGM[constrained_bot, 0]
+
         # For each value of aNrm, find the value of Share such that FOC-Share == 0.
         # This loop can probably be eliminated, but it's such a small step that it won't speed things up much.
+        # This loop can be optimized with numba parallelization #TODO
+
+        # find points such that 1 after is less than 0 and one before is greater than 0
         crossing = np.logical_and(FOCs[:, :, 1:] <= 0.0, FOCs[:, :, :-1] >= 0.0)
         for i in range(self.aNrmCount):
             for j in range(self.kNrmCount):
@@ -464,9 +482,9 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
                     top_c = self.cEGM[i, j, idx + 1]
                     alpha = 1.0 - top_f / (top_f - bot_f)
                     self.shareSoln[i, j] = (1.0 - alpha) * bot_s + alpha * top_s
-                    self.cNrmNow[i, j] = (1.0 - alpha) * bot_c + alpha * top_c
+                    self.cNrmSoln[i, j] = (1.0 - alpha) * bot_c + alpha * top_c
 
-    def dvdkNowFunc(self, shocks, a_nrm, k_nrm, share):
+    def dvdkSoln_helper(self, shocks, a_nrm, k_nrm, share):
 
         b_nrm = a_nrm * (1.0 - share)
         i_nrm = a_nrm * share
@@ -486,36 +504,52 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         the basic solution for this period.
         """
 
-        aNrmNow, kNrmNow = np.meshgrid(self.aNrmGrid, self.kNrmGrid, indexing="ij")
-
         # Calculate the endogenous mNrm gridpoints when the agent adjusts his portfolio
-        mNrmNow = aNrmNow + self.cNrmNow
+        self.mNrmSoln = self.aNrmSoln + self.cNrmSoln
 
-        dvdkNow = self.DiscFac * calc_expectation(
-            self.ShkDstn, self.dvdkNowFunc, aNrmNow, kNrmNow, self.shareSoln
+        dvdkSoln = self.DiscFac * calc_expectation(
+            self.ShkDstn,
+            self.dvdkSoln_helper,
+            self.aNrmSoln,
+            self.kNrmSoln,
+            self.shareSoln,
         )
+
+        dvdkSoln = dvdkSoln[:, :, 0]
 
         cFunc_by_k = []
         shareFunc_by_k = []
         dvdk_by_k = []
-        for i in range(self.kNrmCount):
-            cFunc_by_k.append(
-                LinearInterp(
-                    np.insert(mNrmNow[:, i], 0, 0.0),
-                    np.insert(self.cNrmNow[:, i], 0, 0.0),
-                )
-            )
 
-            shareFunc_by_k.append(LinearInterp(mNrmNow[:, i], self.shareNow[:, i]))
+        mNrm_temp = np.insert(self.mNrmSoln, 0, 0.0, axis=0)
+        cNrm_temp = np.insert(self.cNrmSoln, 0, 0.0, axis=0)
+        # is this acurate? maybe it's the opposite; also what is the share limit?
+        Share_lower_bound = 1.0
+        share_temp = np.insert(self.shareNow, 0, Share_lower_bound, axis=0)
+        # why do we repeat the last point?
+        dvdk_temp = np.insert(dvdkSoln, 0, dvdkSoln[0], axis=0)
 
-            dvdk_by_k.append(LinearInterp(mNrmNow[:, i], dvdkNow[:, i]))
+        # still need a fix for when k is low, below min(kNrmGrid)
+        kNrm_temp = np.insert(self.kNrmGrid, 0, 0.0)
+        # for now, assume if k is 0; agent puts all on children
+        # repeat lowest m; it doesn't matter what it is
+        mNrm_temp = np.insert(mNrm_temp, 0, mNrm_temp[:, 0], axis=1)
+        # consume 0 when kNrm is 0; all in on child
+        cNrm_temp = np.insert(cNrm_temp, 0, 0.0, axis=1)
+        # invest all on child at kNrm = 0
+        share_temp = np.insert(share_temp, 0, Share_lower_bound, axis=1)
 
-        self.cFuncNow = LinearInterpOnInterp1D(cFunc_by_k, self.kNrmGrid)
+        for i in range(self.kNrmCount + 1):
+            cFunc_by_k.append(LinearInterp(mNrm_temp[:, i], cNrm_temp[:, i]))
+            shareFunc_by_k.append(LinearInterp(mNrm_temp[:, i], share_temp[:, i]))
+            dvdk_by_k.append(LinearInterp(mNrm_temp[:, i], dvdk_temp[:, i]))
+
+        self.cFuncNow = LinearInterpOnInterp1D(cFunc_by_k, kNrm_temp)
 
         # Construct the marginal value (of mNrm) function when the agent can adjust
         self.vPfuncNow = MargValueFuncCRRA(self.cFuncNow, self.CRRA)
 
-        self.dvdkFuncNow = LinearInterpOnInterp1D(dvdk_by_k, self.kNrmGrid)
+        self.dvdkFuncNow = LinearInterpOnInterp1D(dvdk_by_k, kNrm_temp)
 
     def add_vFunc(self):
         """
@@ -525,14 +559,14 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         self.make_EndOfPrdvFunc()
         self.make_vFunc()
 
-    def v_intermed_Func(self, shocks, b_nrm_next, k_nrm_next):
+    def vFrak_helper(self, shocks, b_nrm_next, k_nrm_next):
         mNrm_next = self.m_nrm_next(shocks, b_nrm_next)
 
         v_next = self.vFuncNext(mNrm_next, k_nrm_next / shocks[self.PermShkIdx])
 
         return (shocks[self.PermShkIdx] * self.PermGroFac) ** (1.0 - self.CRRA) * v_next
 
-    def EndOfPrdvFunc(self, shocks, a_nrm, k_nrm, share):
+    def EndOfPrdv_helper(self, shocks, a_nrm, k_nrm, share):
 
         b_nrm = a_nrm * (1 - share)
         i_nrm = a_nrm * share
@@ -540,7 +574,7 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         b_nrm_next = self.b_nrm_next(shocks, b_nrm)
         k_nrm_next = self.k_nrm_next(shocks, i_nrm, k_nrm)
 
-        return self.vFunc_intermed(b_nrm_next, k_nrm_next)
+        return self.vFrakFunc(b_nrm_next, k_nrm_next)
 
     def make_EndOfPrdvFunc(self):
         """
@@ -549,19 +583,21 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         """
 
         # Calculate intermediate value by taking expectations over income shocks
-        v_intermed = calc_expectation(
-            self.IncShkDstn, self.v_intermed_Func, self.bNrmNext, self.kNrmNext
+        vFrak = calc_expectation(
+            self.IncShkDstn, self.vFrak_helper, self.bNrmNext, self.kNrmNext
         )
-        v_intermed = v_intermed[:, :, 0]
-        vNvrs_intermed = self.uinv(v_intermed)
-        vNvrsFunc_intermed = BilinearInterp(
-            vNvrs_intermed, self.bNrmGrid, self.kNrmGrid
-        )
-        self.vFunc_intermed = ValueFuncCRRA(vNvrsFunc_intermed, self.CRRA)
+        vFrak = vFrak[:, :, 0]
+        vFrakNvrs = self.uinv(vFrak)
+        vFrakNvrsFunc = BilinearInterp(vFrakNvrs, self.bNrmGrid, self.kNrmGrid)
+        self.vFrakFunc = ValueFuncCRRA(vFrakNvrsFunc, self.CRRA)
 
         # Calculate end-of-period value by taking expectations
         self.EndOfPrdv = self.DiscFac * calc_expectation(
-            self.ShkDstn, self.EndOfPrdvFunc, self.aNrmNow, self.kNrmNow, self.shareNow
+            self.ShkDstn,
+            self.EndOfPrdv_helper,
+            self.aNrmSoln,
+            self.kNrmSoln,
+            self.shareSoln,
         )
         self.EndOfPrdv = self.EndOfPrdv[:, :, :, 0]
         self.EndOfPrdvNvrs = self.uinv(self.EndOfPrdv)
@@ -580,23 +616,28 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         )
         EndOfPrdvFunc = ValueFuncCRRA(EndOfPrdvNvrsFunc, self.CRRA)
 
-        aNrmNow, kNrmNow = np.meshgrid(self.aNrmGrid, self.kNrmGrid, indexing="ij")
-
         # Construct the value function when the agent can adjust his portfolio
-        mNrm_temp = aNrmNow  # Just use aXtraGrid as our grid of mNrm values
-        cNrm_temp = self.cFuncAdj_now(mNrm_temp, kNrmNow)
+        mNrm_temp = self.aNrmSoln  # Just use aXtraGrid as our grid of mNrm values
+        cNrm_temp = self.cFuncAdj_now(mNrm_temp, self.kNrmSoln)
         aNrm_temp = mNrm_temp - cNrm_temp
-        Share_temp = self.ShareFuncAdj_now(mNrm_temp, kNrmNow)
-        v_temp = self.u(cNrm_temp) + EndOfPrdvFunc(aNrm_temp, kNrmNow, Share_temp)
+        Share_temp = self.ShareFuncAdj_now(mNrm_temp, self.kNrmSoln)
+        v_temp = self.u(cNrm_temp) + EndOfPrdvFunc(aNrm_temp, self.kNrmSoln, Share_temp)
         vNvrs_temp = self.uinv(v_temp)
         vNvrsP_temp = self.uP(cNrm_temp) * self.uinvP(v_temp)
-        vNvrsFuncAdj = CubicInterp(
-            np.insert(mNrm_temp, 0, 0.0, axis=0),  # x_list
-            np.insert(vNvrs_temp, 0, 0.0, axis=0),  # f_list
-            np.insert(vNvrsP_temp, 0, vNvrsP_temp[0], axis=0),  # dfdx_list
-        )
+
+        vNvrs_by_k = []
+        for i in range(self.kNrmCount):
+            vNvrs_by_k.append(
+                CubicInterp(
+                    np.insert(mNrm_temp, 0, 0.0, axis=0),  # x_list
+                    np.insert(vNvrs_temp, 0, 0.0, axis=0),  # f_list
+                    np.insert(vNvrsP_temp, 0, vNvrsP_temp[0], axis=0),  # dfdx_list
+                )
+            )
+
+        vNvrsFunc = LinearInterpOnInterp1D(vNvrs_by_k, self.kNrmGrid)
         # Re-curve the pseudo-inverse value function
-        self.vFuncAdj_now = ValueFuncCRRA(vNvrsFuncAdj, self.CRRA)
+        self.vFuncSoln = ValueFuncCRRA(vNvrsFunc, self.CRRA)
 
 
 class ConsGenIncParentSolver(ConsGenIncProcessSolver):
@@ -962,3 +1003,11 @@ class ConsGenIncParentSolver(ConsGenIncProcessSolver):
             intercept_limit=self.shareLimit,
             slope_limit=0.0,
         )
+
+
+init_parent = {
+    "TotlFactrProd": [1.0],
+    "InvstShare": [1 / 3],
+    "KaptlShare": [1 / 3],
+    "IncomShare": [1 / 3],
+}
