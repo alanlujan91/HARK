@@ -544,12 +544,12 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
             shareFunc_by_k.append(LinearInterp(mNrm_temp[:, i], share_temp[:, i]))
             dvdk_by_k.append(LinearInterp(mNrm_temp[:, i], dvdk_temp[:, i]))
 
-        self.cFuncNow = LinearInterpOnInterp1D(cFunc_by_k, kNrm_temp)
+        self.cFuncSoln = LinearInterpOnInterp1D(cFunc_by_k, kNrm_temp)
 
         # Construct the marginal value (of mNrm) function when the agent can adjust
-        self.vPfuncNow = MargValueFuncCRRA(self.cFuncNow, self.CRRA)
+        self.vPfuncSoln = MargValueFuncCRRA(self.cFuncNow, self.CRRA)
 
-        self.dvdkFuncNow = LinearInterpOnInterp1D(dvdk_by_k, kNrm_temp)
+        self.dvdkFuncSoln = LinearInterpOnInterp1D(dvdk_by_k, kNrm_temp)
 
     def add_vFunc(self):
         """
@@ -638,6 +638,44 @@ class ConsNrmIncParentSolver(ConsIndShockSolver):
         vNvrsFunc = LinearInterpOnInterp1D(vNvrs_by_k, self.kNrmGrid)
         # Re-curve the pseudo-inverse value function
         self.vFuncSoln = ValueFuncCRRA(vNvrsFunc, self.CRRA)
+
+    def make_solution(self):
+
+        self.solution = ParentalSolution(
+            cFunc=self.cFuncSoln,
+            shareFunc=self.shareFuncSoln,
+            vPfunc=self.vPfuncSoln,
+            vFunc=self.vFuncASoln,
+            dvdkFunc=self.dvdkFuncNow,
+            dvdmFunc=self.vPfuncSoln,
+        )
+
+    def solve(self):
+        """
+        Solve the one period problem for a portfolio-choice consumer.
+
+        Returns
+        -------
+        solution_now : PortfolioSolution
+        The solution to the single period consumption-saving with portfolio choice
+        problem.  Includes two consumption and risky share functions: one for when
+        the agent can adjust his portfolio share (Adj) and when he can't (Fxd).
+        """
+
+        # Make arrays of end-of-period assets and end-of-period marginal values
+        self.prepare_to_calc_EndOfPrdvP()
+        self.calc_EndOfPrdvP()
+
+        # Construct a basic solution for this period
+        self.optimize_share()
+        self.make_basic_solution()
+
+        # Add the value function
+        self.add_vFunc()
+
+        self.make_solution()
+
+        return self.solution
 
 
 class ConsGenIncParentSolver(ConsGenIncProcessSolver):
