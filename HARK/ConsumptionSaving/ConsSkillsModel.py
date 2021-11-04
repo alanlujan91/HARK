@@ -11,7 +11,13 @@ from HARK.ConsumptionSaving.ConsGenIncProcessModel import (
     ConsGenIncProcessSolver,
 )
 from HARK.ConsumptionSaving.ConsIndShockModel import ConsIndShockSolver
-from HARK.distribution import calc_expectation
+from HARK.ConsumptionSaving.ConsPortfolioModel import PortfolioConsumerType, ConsPortfolioSolver
+from HARK.distribution import (
+    calc_expectation,
+    IndexDistribution,
+    Lognormal,
+    combine_indep_dstns,
+)
 from HARK.interpolation import (
     MargValueFuncCRRA,
     TrilinearInterp,
@@ -139,13 +145,28 @@ class ParentalSolution(MetricObject):
         self.dvdkFunc = dvdkFunc
 
 
-class ParentConsumerType(GenIncProcessConsumerType):
-    state_vars = GenIncProcessConsumerType.state_vars + ["kLvl"]
+class ParentConsumerType(PortfolioConsumerType):
+    """
+    A consumer type with an investment choice. This agent can either invest on a risky asset
+    or invest on the human capital production of their children.
+    """
+
+    state_vars = PortfolioConsumerType.state_vars + ["kLvl"]
 
     def __init__(self, verbose=False, quiet=False, **kwds):
         params = init_parent.copy()
         params.update(kwds)
         kwds = params
+
+        # Initialize a basic consumer type
+        PortfolioConsumerType.__init__(self, verbose=verbose, quiet=quiet, **kwds)
+
+        if self.SubsParam == 0.0:
+            solver = ConsNrmIncParentSolver
+        else:
+            solver = ConsGenIncParentSolver
+
+        self.solve_one_period = solver
 
     def update_kLvlNextFunc(self):
         self.kLvlNextFunc = HumanCapitalProductionFunctionCD(
@@ -154,6 +175,87 @@ class ParentConsumerType(GenIncProcessConsumerType):
 
     def update_kLvlGrid(self):
         pass
+
+    def update_HumanDstn(self):
+        """
+        Creates the attributes HumanDstn from the primitive attributes HumanAvg,
+        HumanStd, and HumanCount, approximating the (perceived) distribution of
+        shocks to human capital.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        # Determine whether this instance has time-varying risk perceptions
+        if (
+            (type(self.HumanAvg) is list)
+            and (type(self.HumanStd) is list)
+            and (len(self.HumanAvg) == len(self.HumanStd))
+            and (len(self.HumanAvg) == self.T_cycle)
+        ):
+            self.add_to_time_vary("HumanAvg", "HumanStd")
+        elif (type(self.HumanStd) is list) or (type(self.HumanAvg) is list):
+            raise AttributeError(
+                "If HumanAvg is time-varying, then HumanStd must be as well, and they must both have length of T_cycle!"
+            )
+        else:
+            self.add_to_time_inv("HumanAvg", "HumanStd")
+
+        # Generate a discrete approximation to the Human return distribution if the
+        # agent has age-varying beliefs about the Human asset
+        if "HumanAvg" in self.time_vary:
+            self.HumanDstn = IndexDistribution(
+                Lognormal.from_mean_std,
+                {"mean": self.HumanAvg, "std": self.HumanStd},
+                seed=self.RNG.randint(0, 2 ** 31 - 1),
+            ).approx(self.HumanCount)
+
+            self.add_to_time_vary("HumanDstn")
+
+        # Generate a discrete approximation to the Human return distribution if the
+        # agent does *not* have age-varying beliefs about the Human asset (base case)
+        else:
+            self.HumanDstn = Lognormal.from_mean_std(
+                self.HumanAvg,
+                self.HumanStd,
+            ).approx(self.HumanCount)
+            self.add_to_time_inv("HumanDstn")
+
+    def update_ShockDstn(self):
+        """
+        Combine the Risky return distribution (RiskyDstn) with the
+        Human shock distribution (HumanDstn) to make a new attribute called ShockDstn.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        if "HumanDstn" and "RiskyDstn" in self.time_vary:
+            self.ShockDstn = [
+                combine_indep_dstns(self.RiskyDstn[t], self.HumanDstn[t])
+                for t in range(self.T_cycle)
+            ]
+        elif "RiskyDstn" in self.time_vary:
+            self.ShockDstn = [
+                combine_indep_dstns(self.RiskyDstn[t], self.HumanDstn)
+                for t in range(self.T_cycle)
+            ]
+        elif "HumanDstn" in self.time_vary:
+            self.ShockDstn = [
+                combine_indep_dstns(self.RiskyDstn, self.HumanDstn[t])
+                for t in range(self.T_cycle)
+            ]
+        else:
+            self.ShockDstn = combine_indep_dstns(self.RiskyDstn, self.HumanDstn)
+        self.add_to_time_vary("ShockDstn")
 
 
 class ConsNrmIncParentSolver(ConsIndShockSolver):
