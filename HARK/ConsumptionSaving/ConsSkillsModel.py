@@ -7,11 +7,10 @@ import numpy as np
 
 from HARK import MetricObject, NullFunc
 from HARK.ConsumptionSaving.ConsGenIncProcessModel import (
-    GenIncProcessConsumerType,
     ConsGenIncProcessSolver,
 )
 from HARK.ConsumptionSaving.ConsIndShockModel import ConsIndShockSolver
-from HARK.ConsumptionSaving.ConsPortfolioModel import PortfolioConsumerType, ConsPortfolioSolver
+from HARK.ConsumptionSaving.ConsPortfolioModel import PortfolioConsumerType
 from HARK.distribution import (
     calc_expectation,
     IndexDistribution,
@@ -168,10 +167,31 @@ class ParentConsumerType(PortfolioConsumerType):
 
         self.solve_one_period = solver
 
-    def update_kLvlNextFunc(self):
-        self.kLvlNextFunc = HumanCapitalProductionFunctionCD(
-            self.TotlFactrProd, self.InvstShare, self.KaptlShare
-        )
+    def update_KaptlNextFunc(self):
+
+        if (
+            (
+                type(self.TotlFactrProd) is list
+                and len(self.TotlFactrProd) == self.T_cycle
+            )
+            and (type(self.InvstShare) is list and len(self.InvstShare) == self.T_cycle)
+            and (type(self.KaptlShare) is list and len(self.KaptlShare) == self.T_cycle)
+        ):
+            self.add_to_time_vary("kLvlNextFunc")
+            self.kLvlNextFunc = [
+                HumanCapitalProductionFunctionCD(
+                    self.TotlFactrProd[t], self.InvstShare[t], self.KaptlShare[t]
+                )
+                for t in range(self.T_cycle)
+            ]
+        elif (
+            type(self.TotlFactrProd) is list
+            or type(self.InvstShare) is list
+            or type(self.KaptlShare) is list
+        ):
+            raise AttributeError(
+                "If Human Capital production function is time-varying, then TotlFactrProd, InvstShare, and KaptlShare must be as well, and they must all have length of T_cycle!"
+            )
 
     def update_kLvlGrid(self):
         pass
