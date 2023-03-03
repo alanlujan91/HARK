@@ -505,7 +505,7 @@ def save_nelder_mead_data(name, simplex, fvals, iters, evals):
     None
     """
     N = simplex.shape[0]  # Number of points in simplex
-    K = simplex.shape[1]  # Total number of parameters
+    simplex.shape[1]  # Total number of parameters
 
     with open(name + ".txt", "w") as f:
         my_writer = csv.writer(f, delimiter=",")

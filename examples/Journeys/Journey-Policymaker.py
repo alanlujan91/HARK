@@ -167,7 +167,7 @@ IndShockExample_inf.initialize_sim()
 IndShockExample_inf.simulate()
 
 # %%
-from HARK.utilities import get_lorenz_shares, get_percentiles
+from HARK.utilities import get_lorenz_shares
 
 pctiles = np.linspace(0.001, 0.999, 200)
 sim_Lorenz_points = get_lorenz_shares(

@@ -42,14 +42,13 @@
 # ## Consumption-Saving model with Idiosyncratic Income Shocks
 
 # %% {"collapsed": false, "jupyter": {"outputs_hidden": false}, "pycharm": {"name": "#%%\n"}}
-import matplotlib.pyplot as plt
-import numpy as np
 
 # Initial imports and notebook setup, click arrow to show
 from HARK.ConsumptionSaving.ConsIndShockModelFast import IndShockConsumerTypeFast
 from HARK.utilities import plot_funcs_der, plot_funcs
 
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 
 # %% [markdown]
 # The module `HARK.ConsumptionSaving.ConsIndShockModelFast` concerns consumption-saving models with idiosyncratic shocks to (non-capital) income.  All of the models assume CRRA utility with geometric discounting, no bequest motive, and income shocks are fully transitory or fully permanent.

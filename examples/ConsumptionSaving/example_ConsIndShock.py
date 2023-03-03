@@ -26,7 +26,8 @@ from HARK.utilities import plot_funcs_der, plot_funcs
 from time import time
 
 # %%
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 
 
 # %%

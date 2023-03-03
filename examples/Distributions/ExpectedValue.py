@@ -154,7 +154,8 @@ for n in size:
     TranShkDstn = MeanOneLogNormal().discretize(n)
     IncShkDstn = combine_indep_dstns(PermShkDstn, TranShkDstn)
 
-    m_next = lambda X, a, r: r * a / X[0] + X[1]
+    def m_next(X, a, r):
+        return r * a / X[0] + X[1]
     a_grid = np.linspace(0, 20, 100).reshape((10, 10))
     R = 1.05
 

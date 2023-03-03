@@ -24,7 +24,8 @@ from HARK.ConsumptionSaving.ConsIndShockModel import init_idiosyncratic_shocks
 from HARK.ConsumptionSaving.ConsMarkovModel import MarkovConsumerType
 from HARK.distribution import DiscreteDistributionLabeled
 
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 do_simulation = True
 
 # %% [markdown]

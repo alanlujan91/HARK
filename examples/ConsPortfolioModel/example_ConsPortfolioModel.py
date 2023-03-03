@@ -24,7 +24,7 @@
 # From there, the `ConsPortfolioDict` dictionary is introduced to create the `PortfolioConsumerType` and each of the subseqeunt agent types using it.
 
 # %%
-from copy import copy, deepcopy
+from copy import copy
 from time import time
 
 import matplotlib.pyplot as plt
@@ -39,7 +39,6 @@ from HARK.ConsumptionSaving.ConsIndShockModel import (
 )
 from HARK.ConsumptionSaving.ConsPortfolioModel import (
     PortfolioConsumerType,
-    init_portfolio,
 )
 from HARK.utilities import plot_funcs
 

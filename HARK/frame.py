@@ -1,14 +1,13 @@
 import copy
 import itertools
 from collections import OrderedDict
-from sre_constants import SRE_FLAG_ASCII
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
 from HARK import AgentType, Model
-from HARK.distribution import Distribution, TimeVaryingDiscreteDistribution
+from HARK.distribution import Distribution
 
 
 class Frame:

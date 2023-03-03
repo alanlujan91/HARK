@@ -26,7 +26,8 @@ from HARK.utilities import plot_funcs_der, plot_funcs
 import matplotlib.pyplot as plt
 import numpy as np
 
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 
 # %% [markdown]
 # The module `HARK.ConsumptionSaving.ConsIndShockModel` concerns consumption-saving models with idiosyncratic shocks to (non-capital) income.  All of the models assume CRRA utility with geometric discounting, no bequest motive, and income shocks are fully transitory or fully permanent.

@@ -6,20 +6,14 @@ of agents, where agents take the inputs to their problem as exogenous.  A macro
 model adds an additional layer, endogenizing some of the inputs to the micro
 problem by finding a general equilibrium dynamic rule.
 """
-import os
 import sys
 from copy import copy, deepcopy
-from distutils.dir_util import copy_tree
 from time import time
 from warnings import warn
 
 import numpy as np
 
-from HARK.distribution import (
-    Distribution,
-    IndexDistribution,
-    TimeVaryingDiscreteDistribution,
-)
+from HARK.distribution import IndexDistribution, TimeVaryingDiscreteDistribution
 
 from .parallel import multi_thread_commands, multi_thread_commands_fake
 from .utilities import NullFunc, get_arg_names
@@ -1511,7 +1505,6 @@ class Market(Model):
             Should have attributes named in dyn_vars.
         """
         # Make a dictionary of inputs for the dynamics calculator
-        history_vars_string = ""
         arg_names = list(get_arg_names(self.calc_dynamics))
         if "self" in arg_names:
             arg_names.remove("self")

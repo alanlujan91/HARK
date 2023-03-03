@@ -113,11 +113,12 @@ class MedShockPolicyFunc(MetricObject):
                 elif MedShk == 0:  # All consumption when MedShk = 0
                     cLvl = xLvl
                 else:
-                    optMedZeroFunc = (
-                        lambda c: (MedShk / MedPrice) ** (-1.0 / CRRAcon)
-                        * ((xLvl - c) / MedPrice) ** (CRRAmed / CRRAcon)
-                        - c
-                    )
+
+                    def optMedZeroFunc(c):
+                        return (MedShk / MedPrice) ** (-1.0 / CRRAcon) * (
+                            (xLvl - c) / MedPrice
+                        ) ** (CRRAmed / CRRAcon) - c
+
                     # Find solution to FOC
                     cLvl = brentq(optMedZeroFunc, 0.0, xLvl)
                 cLvlGrid[i, j] = cLvl

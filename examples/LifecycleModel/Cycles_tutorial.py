@@ -20,15 +20,13 @@
 
 # %%
 # Attempt at combining the imports from both notebooks -- it works!
-import matplotlib.pyplot as plt
 import numpy as np
-import HARK
 
-from copy import deepcopy
 from HARK.ConsumptionSaving.ConsIndShockModel import *
-from HARK.utilities import plot_funcs_der, plot_funcs
+from HARK.utilities import plot_funcs
 
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 
 # %% [markdown]
 # ## 1. The model with age-dependent parameters

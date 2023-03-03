@@ -1,8 +1,6 @@
 import copy
 import unittest
 
-import numpy as np
-
 from HARK import distribute_params
 from HARK.ConsumptionSaving.ConsAggShockModel import (
     AggShockConsumerType,

@@ -215,8 +215,10 @@ class RiskyContribConsumerType(RiskyAssetConsumerType):
         dvdmFunc_Reb_Adj_term = MargValueFuncCRRA(
             lambda m, n: m + n / (1 + tau), self.CRRA
         )
+
         # A marginal unit of n will be withdrawn and put into m. Then consumed.
-        dvdnFunc_Reb_Adj_term = lambda m, n: dvdmFunc_Reb_Adj_term(m, n) / (1 + tau)
+        def dvdnFunc_Reb_Adj_term(m, n):
+            return dvdmFunc_Reb_Adj_term(m, n) / (1 + tau)
 
         Reb_stage_sol = RiskyContribRebSolution(
             # Rebalancing stage
@@ -509,7 +511,7 @@ class RiskyContribConsumerType(RiskyAssetConsumerType):
 
         # Post-states are assets after rebalancing
 
-        if not "tau" in self.time_vary:
+        if "tau" not in self.time_vary:
             mNrmTilde, nNrmTilde = rebalance_assets(
                 self.controls["dfrac"],
                 self.state_now["mNrm"],
@@ -1101,9 +1103,14 @@ def solve_RiskyContrib_Cns(
         )
 
     # Define temporary functions for utility and its derivative and inverse
-    u = lambda x: utility(x, CRRA)
-    uPinv = lambda x: utilityP_inv(x, CRRA)
-    uInv = lambda x: utility_inv(x, CRRA)
+    def u(x):
+        return utility(x, CRRA)
+
+    def uPinv(x):
+        return utilityP_inv(x, CRRA)
+
+    def uInv(x):
+        return utility_inv(x, CRRA)
 
     # Unpack next period's solution
     vFunc_Reb_Adj_next = solution_next.vFunc_Adj
@@ -1121,27 +1128,42 @@ def solve_RiskyContrib_Cns(
     # Start by constructing functions for next-period's pre-adjustment-shock
     # expected value functions
     if AdjustPrb < 1.0:
-        dvdm_next = lambda m, n, s: AdjustPrb * dvdmFunc_Reb_Adj_next(m, n) + (
-            1.0 - AdjustPrb
-        ) * dvdmFunc_Reb_Fxd_next(m, n, s)
-        dvdn_next = lambda m, n, s: AdjustPrb * dvdnFunc_Reb_Adj_next(m, n) + (
-            1.0 - AdjustPrb
-        ) * dvdnFunc_Reb_Fxd_next(m, n, s)
-        dvds_next = lambda m, n, s: (1.0 - AdjustPrb) * dvdsFunc_Reb_Fxd_next(m, n, s)
+
+        def dvdm_next(m, n, s):
+            return AdjustPrb * dvdmFunc_Reb_Adj_next(m, n) + (
+                1.0 - AdjustPrb
+            ) * dvdmFunc_Reb_Fxd_next(m, n, s)
+
+        def dvdn_next(m, n, s):
+            return AdjustPrb * dvdnFunc_Reb_Adj_next(m, n) + (
+                1.0 - AdjustPrb
+            ) * dvdnFunc_Reb_Fxd_next(m, n, s)
+
+        def dvds_next(m, n, s):
+            return (1.0 - AdjustPrb) * dvdsFunc_Reb_Fxd_next(m, n, s)
 
         # Value function if needed
         if vFuncBool:
-            v_next = lambda m, n, s: AdjustPrb * vFunc_Reb_Adj_next(m, n) + (
-                1.0 - AdjustPrb
-            ) * vFunc_Reb_Fxd_next(m, n, s)
+
+            def v_next(m, n, s):
+                return AdjustPrb * vFunc_Reb_Adj_next(m, n) + (
+                    1.0 - AdjustPrb
+                ) * vFunc_Reb_Fxd_next(m, n, s)
 
     else:
-        dvdm_next = lambda m, n, s: dvdmFunc_Reb_Adj_next(m, n)
-        dvdn_next = lambda m, n, s: dvdnFunc_Reb_Adj_next(m, n)
+
+        def dvdm_next(m, n, s):
+            return dvdmFunc_Reb_Adj_next(m, n)
+
+        def dvdn_next(m, n, s):
+            return dvdnFunc_Reb_Adj_next(m, n)
+
         dvds_next = ConstantFunction(0.0)
 
         if vFuncBool:
-            v_next = lambda m, n, s: vFunc_Reb_Adj_next(m, n)
+
+            def v_next(m, n, s):
+                return vFunc_Reb_Adj_next(m, n)
 
     if IndepDstnBool and not joint_dist_solver:
         # If income and returns are independent we can use the law of iterated
@@ -1539,7 +1561,8 @@ def solve_RiskyContrib_Sha(
     dvdnFunc_Cns_next = solution_next.dvdnFunc
     dvdsFunc_Cns_next = solution_next.dvdsFunc
 
-    uPinv = lambda x: utilityP_inv(x, CRRA)
+    def uPinv(x):
+        return utilityP_inv(x, CRRA)
 
     # Create tiled grids
 
@@ -1709,7 +1732,8 @@ def solve_RiskyContrib_Reb(
     dvdnFunc_Fxd_next = solution_next.dvdnFunc_Fxd
     dvdsFunc_Fxd_next = solution_next.dvdsFunc_Fxd
 
-    uPinv = lambda x: utilityP_inv(x, CRRA)
+    def uPinv(x):
+        return utilityP_inv(x, CRRA)
 
     # Create tiled grids
 

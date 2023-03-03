@@ -66,7 +66,8 @@ print(
 # %%
 # Plot the consumption function and whatnot
 m_upper = 1.5 * ExampleType.mTarg
-conFunc_PF = lambda m: ExampleType.h * ExampleType.PFMPC + ExampleType.PFMPC * m
+def conFunc_PF(m):
+    return ExampleType.h * ExampleType.PFMPC + ExampleType.PFMPC * m
 # plot_funcs([ExampleType.solution[0].cFunc,ExampleType.mSSfunc,ExampleType.cSSfunc],0,m_upper)
 plot_funcs([ExampleType.solution[0].cFunc, ExampleType.solution[0].cFunc_U], 0, m_upper)
 
@@ -150,7 +151,8 @@ print(
 )
 # plot_funcs([ExampleType.solution[0].cFunc,ExampleType.solution[0].cFunc_U],0,m_upper)
 plot_funcs(MarkovType.cFunc[0], 0, m_upper)
-diffFunc = lambda m: ExampleType.solution[0].cFunc(m) - MarkovType.cFunc[0][0](m)
+def diffFunc(m):
+    return ExampleType.solution[0].cFunc(m) - MarkovType.cFunc[0][0](m)
 print("Difference between the (employed) consumption functions:")
 plot_funcs(diffFunc, 0, m_upper)
 

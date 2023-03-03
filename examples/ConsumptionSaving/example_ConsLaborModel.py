@@ -35,7 +35,8 @@ import matplotlib.pyplot as plt
 from time import process_time
 
 # %%
-mystr = lambda number: "{:.4f}".format(number)  # Format numbers as strings
+def mystr(number):
+    return "{:.4f}".format(number)  # Format numbers as strings
 
 # %%
 do_simulation = True

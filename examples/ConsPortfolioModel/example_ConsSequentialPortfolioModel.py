@@ -18,13 +18,11 @@
 """
 Example implementations of SequentialPortfolioConsumerType
 """
-from copy import copy
 from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from HARK.ConsumptionSaving.ConsIndShockModel import init_lifecycle
 from HARK.ConsumptionSaving.ConsPortfolioModel import (
     SequentialPortfolioConsumerType,
     init_portfolio,

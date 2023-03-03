@@ -16,19 +16,16 @@
 # %%
 from HARK.frame import (
     BackwardFrameReference,
-    ForwardFrameReference,
     Frame,
     FrameAgentType,
     FrameModel,
     draw_frame_model,
 )
 
-from HARK.distribution import combine_indep_dstns, add_discrete_outcome_constant_mean
 from HARK.distribution import (
     IndexDistribution,
     Lognormal,
-    MeanOneLogNormal,
-    Bernoulli,  # Random draws for simulating agents
+    MeanOneLogNormal,  # Random draws for simulating agents
 )
 
 from HARK.rewards import (
@@ -193,7 +190,6 @@ model.frames
 # %%
 def make_decision_rule(control_frame: Frame):
     # get scope
-    scope = control_frame.scope
 
     # get objective function
 

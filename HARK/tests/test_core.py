@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from HARK.core import AgentType, MetricObject, Model, distance_metric, distribute_params
+from HARK.core import AgentType, MetricObject, distance_metric, distribute_params
 from HARK.distribution import Uniform
 
 

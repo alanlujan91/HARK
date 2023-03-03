@@ -323,7 +323,7 @@ class testIndShockConsumerTypeLifecycle(unittest.TestCase):
 
         self.assertEqual(len(LifecycleExample.solution), 11)
 
-        mMin = np.min(
+        np.min(
             [
                 LifecycleExample.solution[t].mNrmMin
                 for t in range(LifecycleExample.T_cycle)
@@ -349,7 +349,7 @@ class testIndShockConsumerTypeLifecycleRfree(unittest.TestCase):
 
         self.assertEqual(len(LifecycleRfreeExample.solution), 11)
 
-        mMin = np.min(
+        np.min(
             [
                 LifecycleRfreeExample.solution[t].mNrmMin
                 for t in range(LifecycleRfreeExample.T_cycle)
@@ -723,9 +723,8 @@ class test_Harmenbergs_method(unittest.TestCase):
             Magg = np.mean(example2.history["mNrm"][i] * example2.history["pLvl"][i])
             M_list2.append(Magg)
 
-        c_std2 = np.std(Consumption_list2)
-        c_std1 = np.std(Consumption_list)
-        c_std_ratio = c_std2 / c_std1
+        np.std(Consumption_list2)
+        np.std(Consumption_list)
 
         # simulation tests -- seed/generator specific
         # But these are based on aggregate population statistics.

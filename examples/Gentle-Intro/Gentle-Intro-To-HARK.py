@@ -28,12 +28,10 @@
 #   The most common problem beginners have is to execute a cell before all its predecessors
 #   If you do this, you can restart the kernel (see the "Kernel" menu above) and start over
 
-import matplotlib.pyplot as plt
-import numpy as np
-import HARK
 from copy import deepcopy
 
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 from HARK.utilities import plot_funcs
 
 # %% [markdown]

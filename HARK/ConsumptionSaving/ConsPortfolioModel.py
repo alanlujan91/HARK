@@ -33,7 +33,6 @@ from HARK.ConsumptionSaving.ConsIndShockModel import (
     utilityP_inv,  # Inverse CRRA marginal utility function
 )
 from HARK.ConsumptionSaving.ConsRiskyAssetModel import RiskyAssetConsumerType
-from HARK.distribution import calc_expectation
 from HARK.interpolation import BilinearInterp  # 2D interpolator
 from HARK.interpolation import (
     ConstantFunction,  # Interpolator-like class that returns constant value

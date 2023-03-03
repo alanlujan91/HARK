@@ -18,7 +18,6 @@ import HARK.ConsumptionSaving.ConsPortfolioFrameModel as cpfm
 import HARK.ConsumptionSaving.ConsPortfolioModel as cpm
 
 from HARK.frame import Frame, draw_frame_model
-import numpy as np
 
 from HARK.rewards import (
     CRRAutility,
@@ -191,7 +190,6 @@ def get_expected_return_function(control: Frame):
     #
 
     rewards = [child for child in control.children if child.reward]
-    expected_values = []  # TODO
 
     ## note: function signature is what's needed for scipy.optimize
     def expected_return_function(x, *args):
@@ -237,10 +235,7 @@ def get_expected_return_function(control: Frame):
 
 # %%
 def optimal_policy_function(control: Frame):
-    erf = get_expected_return_function(control)
-    constraints = (
-        control.constraints
-    )  ## these will reference the context of the control transition, including scope
+    get_expected_return_function(control)
 
     ## Returns function:
     ##   input: control frame scope

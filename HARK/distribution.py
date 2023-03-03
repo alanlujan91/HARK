@@ -1402,7 +1402,7 @@ class IndexDistribution(Distribution):
                 these = c == condition
                 N = np.sum(these)
 
-                cond = {key: val[c] for (key, val) in self.conditional.items()}
+                {key: val[c] for (key, val) in self.conditional.items()}
                 draws[these] = self[c].draw(N)
 
             return draws
@@ -1800,7 +1800,7 @@ def combine_indep_dstns(*distributions, seed=0):
         else:
             var_labels += tuple([""] * dist.dim()[0])
 
-    number_of_distributions = len(distributions)
+    len(distributions)
 
     all_labeled = all(dist_is_labeled)
     labels_are_unique = len(var_labels) == len(set(var_labels))

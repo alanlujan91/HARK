@@ -104,7 +104,6 @@ from HARK.ConsumptionSaving.ConsIndShockModel import (
     init_lifecycle,
 )
 import numpy as np
-import matplotlib.pyplot as plt
 
 LifecycleExample = IndShockConsumerType(**init_lifecycle)
 LifecycleExample.cycles = (

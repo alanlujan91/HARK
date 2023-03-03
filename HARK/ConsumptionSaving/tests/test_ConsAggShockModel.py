@@ -194,7 +194,7 @@ class KrusellSmithMethodsTestCase(KrusellSmithTestCase):
 
         self.economy.make_history()
 
-        emp_totals = np.sum(self.agent.history["EmpNow"], axis=0)
+        np.sum(self.agent.history["EmpNow"], axis=0)
 
         # simulation test -- seed/generator specific
         # self.assertEqual(emp_totals[0], 1011)

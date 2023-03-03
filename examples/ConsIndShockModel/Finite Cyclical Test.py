@@ -16,11 +16,10 @@
 # %%
 # Initial imports and notebook setup, click arrow to show
 from HARK.ConsumptionSaving.ConsIndShockModel import IndShockConsumerType
-from HARK.utilities import plot_funcs_der, plot_funcs
-import matplotlib.pyplot as plt
-import numpy as np
+from HARK.utilities import plot_funcs
 
-mystr = lambda number: "{:.4f}".format(number)
+def mystr(number):
+    return "{:.4f}".format(number)
 
 # %%
 CyclicalDict = {  # Click the arrow to expand this parameter dictionary

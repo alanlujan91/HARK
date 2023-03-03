@@ -53,7 +53,7 @@
 
 import HARK.ConsumptionSaving.ConsIndShockModel as Model  # The consumption-saving micro model
 import EstimationParameters as Params  # Parameters for the consumer type and the estimation
-from HARK.utilities import plot_funcs_der, plot_funcs  # Some tools
+from HARK.utilities import plot_funcs  # Some tools
 
 import numpy as np
 

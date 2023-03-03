@@ -8,7 +8,6 @@ import functools
 import os
 import pstats
 import re
-import warnings  # isort : skip
 
 import numba
 import numpy as np  # Python's numeric library, abbreviated "np"
@@ -901,7 +900,7 @@ def test_latex_installation(pf):
             print("Installing LaTeX now; please wait 3-5 minutes")
             from IPython.utils import io
 
-            with io.capture_output() as captured:  # Hide hideously long output
+            with io.capture_output():  # Hide hideously long output
                 os.system("apt-get update")
                 os.system(
                     "apt-get install texlive texlive-latex-extra texlive-xetex dvipng"
@@ -1075,7 +1074,6 @@ def benchmark(
           Profiling object with call statistics.
     """
 
-    agent = agent_type
     cProfile.run("agent.solve()", filename)
     stats = pstats.Stats(filename)
     stats.strip_dirs()

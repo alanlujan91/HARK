@@ -106,11 +106,10 @@
 # sys.path.insert(0, os.path.abspath('../../../.'))
 import matplotlib.pyplot as plt
 import numpy as np
-import HARK
 
 from copy import deepcopy
 from HARK.ConsumptionSaving.ConsIndShockModel import *
-from HARK.utilities import plot_funcs_der, plot_funcs
+from HARK.utilities import plot_funcs
 
 
 # %% [markdown]
@@ -665,7 +664,7 @@ n, bins, patches = plt.hist(sim_wealth, 100, density=True, range=[0.0, 10.0])
 
 # %%
 
-from HARK.utilities import get_lorenz_shares, get_percentiles
+from HARK.utilities import get_lorenz_shares
 
 
 # %% [markdown]

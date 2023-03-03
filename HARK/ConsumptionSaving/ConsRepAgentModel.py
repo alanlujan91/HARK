@@ -12,7 +12,7 @@ from HARK.ConsumptionSaving.ConsIndShockModel import (
     init_idiosyncratic_shocks,
 )
 from HARK.ConsumptionSaving.ConsMarkovModel import MarkovConsumerType
-from HARK.distribution import MarkovProcess, Uniform
+from HARK.distribution import MarkovProcess
 from HARK.interpolation import LinearInterp, MargValueFuncCRRA
 
 __all__ = ["RepAgentConsumerType", "RepAgentMarkovConsumerType"]

@@ -25,7 +25,6 @@
 from types import SimpleNamespace
 
 import estimagic as em
-import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from HARK.ConsumptionSaving.ConsIndShockModel import PerfForesightConsumerType
