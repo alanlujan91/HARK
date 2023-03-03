@@ -14,9 +14,43 @@ from warnings import warn
 import numpy as np
 
 from HARK.distribution import IndexDistribution, TimeVaryingDiscreteDistribution
+from HARK.parallel import multi_thread_commands, multi_thread_commands_fake
+from HARK.utilities import NullFunc, get_arg_names
 
-from .parallel import multi_thread_commands, multi_thread_commands_fake
-from .utilities import NullFunc, get_arg_names
+
+def distance_list(list_a, list_b):
+    len_a = len(list_a)  # If both inputs are lists, then the distance between
+    len_b = len(list_b)  # them is the maximum distance between corresponding
+    if len_a == len_b:  # elements in the lists.  If they differ in length,
+        return np.max([distance_metric(list_a[n], list_b[n]) for n in range(len_a)])
+    warn(
+        "Objects of different lengths are being compared.  Returning difference in lengths."
+    )
+    return np.abs(len_a - len_b)
+
+
+def distance_dict(dict_a, dict_b):
+    len_a = len(dict_a)
+    len_b = len(dict_b)
+
+    if len_a == len_b:
+        # Create versions sorted by key
+        sorted_a = dict(sorted(dict_a.items()))
+        sorted_b = dict(sorted(dict_b.items()))
+
+        # If keys don't match, print a warning.
+        if list(sorted_a.keys()) != list(sorted_b.keys()):
+            warn("Dictionaries with keys that do not match are being compared.")
+
+        # If both inputs are dictionaries, call distance on the list of its elements
+        return distance_metric(list(sorted_a.values()), list(sorted_b.values()))
+
+    # If they have different lengths, log a warning and return the
+    # difference in lengths.
+    warn(
+        "Objects of different lengths are being compared. Returning difference in lengths."
+    )
+    return np.abs(len_a - len_b)
 
 
 def distance_metric(thing_a, thing_b):
@@ -40,70 +74,31 @@ def distance_metric(thing_a, thing_b):
     type_b = type(thing_b)
 
     if type_a is list and type_b is list:
-        len_a = len(thing_a)  # If both inputs are lists, then the distance between
-        len_b = len(thing_b)  # them is the maximum distance between corresponding
-        if len_a == len_b:  # elements in the lists.  If they differ in length,
-            distance_temp = []  # the distance is the difference in lengths.
-            for n in range(len_a):
-                distance_temp.append(distance_metric(thing_a[n], thing_b[n]))
-            distance = max(distance_temp)
-        else:
-            warn(
-                "Objects of different lengths are being compared. "
-                + "Returning difference in lengths."
-            )
-            distance = float(abs(len_a - len_b))
-    # If both inputs are dictionaries, call distance on the list of its elements
-    elif type_a is dict and type_b is dict:
-        len_a = len(thing_a)
-        len_b = len(thing_b)
+        return distance_list(thing_a, thing_b)
 
-        if len_a == len_b:
-            # Create versions sorted by key
-            sorted_a = dict(sorted(thing_a.items()))
-            sorted_b = dict(sorted(thing_b.items()))
-
-            # If keys don't match, print a warning.
-            if list(sorted_a.keys()) != list(sorted_b.keys()):
-                warn(
-                    "Dictionaries with keys that do not match are being " + "compared."
-                )
-
-            distance = distance_metric(list(sorted_a.values()), list(sorted_b.values()))
-
-        else:
-            # If they have different lengths, log a warning and return the
-            # difference in lengths.
-            warn(
-                "Objects of different lengths are being compared. "
-                + "Returning difference in lengths."
-            )
-            distance = float(abs(len_a - len_b))
+    if type_a is dict and type_b is dict:
+        return distance_dict(thing_a, thing_b)
 
     # If both inputs are numbers, return their difference
-    elif isinstance(thing_a, (int, float)) and isinstance(thing_b, (int, float)):
-        distance = float(abs(thing_a - thing_b))
+    if isinstance(thing_a, (int, float)) and isinstance(thing_b, (int, float)):
+        return np.abs(thing_a - thing_b)
     # If both inputs are array-like, return the maximum absolute difference b/w
     # corresponding elements (if same shape); return largest difference in dimensions
     # if shapes do not align.
-    elif hasattr(thing_a, "shape") and hasattr(thing_b, "shape"):
+    if hasattr(thing_a, "shape") and hasattr(thing_b, "shape"):
         if thing_a.shape == thing_b.shape:
-            distance = np.max(abs(thing_a - thing_b))
-        else:
-            # Flatten arrays so they have the same dimensions
-            distance = np.max(
-                abs(thing_a.flatten().shape[0] - thing_b.flatten().shape[0])
-            )
+            return np.max(abs(thing_a - thing_b))
+        # Flatten arrays so they have the same dimensions
+        return np.max(abs(thing_a.flatten().shape[0] - thing_b.flatten().shape[0]))
     # If none of the above cases, but the objects are of the same class, call
     # the distance method of one on the other
-    elif thing_a.__class__.__name__ == thing_b.__class__.__name__:
+    if thing_a.__class__.__name__ == thing_b.__class__.__name__:
         if thing_a.__class__.__name__ == "function":
-            distance = 0.0
-        else:
-            distance = thing_a.distance(thing_b)
-    else:  # Failsafe: the inputs are very far apart
-        distance = 1000.0
-    return distance
+            return 0.0
+        return thing_a.distance(thing_b)
+
+    # Failsafe: the inputs are very far apart
+    return 1000.0
 
 
 class MetricObject:
