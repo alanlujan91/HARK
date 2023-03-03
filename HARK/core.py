@@ -19,37 +19,45 @@ from HARK.utilities import NullFunc, get_arg_names
 
 
 def distance_list(list_a, list_b):
-    len_a = len(list_a)  # If both inputs are lists, then the distance between
-    len_b = len(list_b)  # them is the maximum distance between corresponding
-    if len_a == len_b:  # elements in the lists.  If they differ in length,
+    """
+    If both inputs are lists, then the distance between
+    them is the maximum distance between corresponding
+    elements in the lists.  If they differ in length,
+
+    Parameters
+    ----------
+    list_a : _type_
+        _description_
+    list_b : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
+    len_a = len(list_a)
+    len_b = len(list_b)
+    if len_a == 0 or len_b == 0:
+        return 0.0
+    if len_a == len_b:
         return np.max([distance_metric(list_a[n], list_b[n]) for n in range(len_a)])
-    warn(
-        "Objects of different lengths are being compared.  Returning difference in lengths."
-    )
+    warn("Lists of different lengths. Returning length difference.")
     return np.abs(len_a - len_b)
 
 
 def distance_dict(dict_a, dict_b):
     len_a = len(dict_a)
     len_b = len(dict_b)
-
     if len_a == len_b:
-        # Create versions sorted by key
-        sorted_a = dict(sorted(dict_a.items()))
-        sorted_b = dict(sorted(dict_b.items()))
-
-        # If keys don't match, print a warning.
-        if list(sorted_a.keys()) != list(sorted_b.keys()):
-            warn("Dictionaries with keys that do not match are being compared.")
-
-        # If both inputs are dictionaries, call distance on the list of its elements
-        return distance_metric(list(sorted_a.values()), list(sorted_b.values()))
-
-    # If they have different lengths, log a warning and return the
-    # difference in lengths.
-    warn(
-        "Objects of different lengths are being compared. Returning difference in lengths."
-    )
+        if set(dict_a.keys()) == set(dict_b.keys()):
+            return np.max(
+                [distance_metric(dict_a[key], dict_b[key]) for key in dict_a.keys()]
+            )
+        warn("Dictionaries with keys that do not match are being compared.")
+        return 1000.0
+    warn("Dicts of different lengths. Returning length difference.")
     return np.abs(len_a - len_b)
 
 
@@ -88,24 +96,21 @@ def distance_metric(thing_a, thing_b):
     distance : float
         The "distance" between thing_a and thing_b.
     """
-    # Get the types of the two inputs
-    type_a = type(thing_a)
-    type_b = type(thing_b)
 
     # If both inputs are numbers, return their difference
     if isinstance(thing_a, (int, float)) and isinstance(thing_b, (int, float)):
         return np.abs(thing_a - thing_b)
 
+    if isinstance(thing_a, list) and isinstance(thing_b, list):
+        return distance_list(thing_a, thing_b)
+
     if isinstance(thing_a, np.ndarray) and isinstance(thing_b, np.ndarray):
         return distance_array(thing_a, thing_b)
 
-    if type_a is list and type_b is list:
-        return distance_list(thing_a, thing_b)
-
-    if type_a is dict and type_b is dict:
+    if isinstance(thing_a, dict) and isinstance(thing_b, dict):
         return distance_dict(thing_a, thing_b)
 
-    if thing_a.__class__.__name__ == thing_b.__class__.__name__:
+    if isinstance(thing_a, type(thing_b)):
         return distance_class(thing_a, thing_b)
 
     # Failsafe: the inputs are very far apart
@@ -137,16 +142,12 @@ class MetricObject:
             The distance between this object and another, using the "universal
             distance" metric.
         """
-        distance_list = [0.0]
-        for attr_name in self.distance_criteria:
-            try:
-                obj_a = getattr(self, attr_name)
-                obj_b = getattr(other, attr_name)
-                distance_list.append(distance_metric(obj_a, obj_b))
-            except AttributeError:
-                # if either object lacks attribute, they are not the same
-                distance_list.append(1000.0)
-        return np.max(distance_list)
+        try:
+            obj_a = [getattr(self, attr_name) for attr_name in self.distance_criteria]
+            obj_b = [getattr(other, attr_name) for attr_name in self.distance_criteria]
+            return np.max(distance_metric(obj_a, obj_b))
+        except AttributeError:
+            return 1000.0
 
 
 class Model:
