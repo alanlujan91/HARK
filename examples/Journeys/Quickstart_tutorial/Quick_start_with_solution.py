@@ -560,7 +560,7 @@ Example_agent_3.unpack("cFunc")
 # Next, we set the minimal value of the gird such that at least one of the consumption functions is defined.
 
 # %%
-min_v = min(Example_agent_3.solution[t].mNrmMin for t in range(11))
+min_v = np.min(Example_agent_3.solution[t].mNrmMin for t in range(11))
 max_v = -min_v
 print("Consumption functions")
 plot_funcs(Example_agent_3.cFunc[:], min_v, max_v)
@@ -752,7 +752,7 @@ Ex_agent.solve()
 
 Ex_agent.unpack("cFunc")
 
-min_v = min(Ex_agent.solution[t].mNrmMin for t in range(11))
+min_v = np.min(Ex_agent.solution[t].mNrmMin for t in range(11))
 max_v = -min_v
 print("Consumption functions")
 plot_funcs(Ex_agent.cFunc[:], min_v, max_v)

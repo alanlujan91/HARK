@@ -1,6 +1,7 @@
 import multiprocessing
 from typing import Any, List
 
+import numpy as np
 from joblib import Parallel, delayed
 
 
@@ -55,7 +56,7 @@ def multi_thread_commands(agent_list: List, command_list: List, num_jobs=None) -
     # Default number of parallel jobs is the smaller of number of AgentTypes in
     # the input and the number of available cores.
     if num_jobs is None:
-        num_jobs = min(len(agent_list), multiprocessing.cpu_count())
+        num_jobs = np.minimum(len(agent_list), multiprocessing.cpu_count())
 
     # Send each command in command_list to each of the types in agent_list to be run
     agent_list_out = Parallel(n_jobs=num_jobs)(

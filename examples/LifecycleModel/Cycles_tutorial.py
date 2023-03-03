@@ -25,8 +25,10 @@ import numpy as np
 from HARK.ConsumptionSaving.ConsIndShockModel import *
 from HARK.utilities import plot_funcs
 
+
 def mystr(number):
     return "{:.4f}".format(number)
+
 
 # %% [markdown]
 # ## 1. The model with age-dependent parameters
@@ -82,7 +84,7 @@ LC_agent.solve()
 # %%
 LC_agent.unpack("cFunc")
 
-min_v = min(LC_agent.solution[t].mNrmMin for t in range(11))
+min_v = np.min(LC_agent.solution[t].mNrmMin for t in range(11))
 max_v = -min_v
 print("Consumption functions")
 plot_funcs(LC_agent.cFunc[:], min_v, max_v)
@@ -253,7 +255,7 @@ CyclicalExample.solve()
 
 CyclicalExample.unpack("cFunc")
 print("Quarterly consumption functions:")
-mMin = min([X.mNrmMin for X in CyclicalExample.solution])
+mMin = np.min([X.mNrmMin for X in CyclicalExample.solution])
 plot_funcs(CyclicalExample.cFunc, mMin, 5)
 
 # %% [markdown]

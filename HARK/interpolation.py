@@ -753,7 +753,7 @@ class LinearInterp(HARKinterpolator1D):
         Slope of limiting linear function.
     lower_extrap : boolean
         Indicator for whether lower extrapolation is allowed.  False means
-        f(x) = NaN for x < min(x_list); True means linear extrapolation.
+        f(x) = NaN for x < np.min(x_list); True means linear extrapolation.
     """
 
     distance_criteria = ["x_list", "y_list"]
@@ -911,7 +911,7 @@ class CubicInterp(HARKinterpolator1D):
         Slope of limiting linear function.
     lower_extrap : boolean
         Indicator for whether lower extrapolation is allowed.  False means
-        f(x) = NaN for x < min(x_list); True means linear extrapolation.
+        f(x) = NaN for x < np.min(x_list); True means linear extrapolation.
     """
 
     distance_criteria = ["x_list", "y_list", "dydx_list"]
@@ -1198,7 +1198,7 @@ class CubicHermiteInterp(HARKinterpolator1D):
         Slope of limiting linear function.
     lower_extrap : boolean
         Indicator for whether lower extrapolation is allowed.  False means
-        f(x) = NaN for x < min(x_list); True means linear extrapolation.
+        f(x) = NaN for x < np.min(x_list); True means linear extrapolation.
     """
 
     distance_criteria = ["x_list", "y_list", "dydx_list"]
@@ -1380,8 +1380,8 @@ class BilinearInterp(HARKinterpolator2D):
         Only called internally by HARKinterpolator2D.__call__ (etc).
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1409,8 +1409,8 @@ class BilinearInterp(HARKinterpolator2D):
         at each value in x,y. Only called internally by HARKinterpolator2D.derivativeX.
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1439,8 +1439,8 @@ class BilinearInterp(HARKinterpolator2D):
         at each value in x,y. Only called internally by HARKinterpolator2D.derivativeY.
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1538,9 +1538,9 @@ class TrilinearInterp(HARKinterpolator3D):
         Only called internally by HARKinterpolator3D.__call__ (etc).
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1590,9 +1590,9 @@ class TrilinearInterp(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeX.
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1633,9 +1633,9 @@ class TrilinearInterp(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeY.
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1676,9 +1676,9 @@ class TrilinearInterp(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeZ.
         """
         if _isscalar(x):
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             x_pos = self.xSearchFunc(self.x_list, x)
             x_pos[x_pos < 1] = 1
@@ -1806,10 +1806,10 @@ class QuadlinearInterp(HARKinterpolator4D):
         Only called internally by HARKinterpolator4D.__call__ (etc).
         """
         if _isscalar(w):
-            w_pos = max(min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            w_pos = np.max(np.min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             w_pos = self.wSearchFunc(self.w_list, w)
             w_pos[w_pos < 1] = 1
@@ -1870,10 +1870,10 @@ class QuadlinearInterp(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeW.
         """
         if _isscalar(w):
-            w_pos = max(min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            w_pos = np.max(np.min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             w_pos = self.wSearchFunc(self.w_list, w)
             w_pos[w_pos < 1] = 1
@@ -1939,10 +1939,10 @@ class QuadlinearInterp(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeX.
         """
         if _isscalar(w):
-            w_pos = max(min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            w_pos = np.max(np.min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             w_pos = self.wSearchFunc(self.w_list, w)
             w_pos[w_pos < 1] = 1
@@ -2008,10 +2008,10 @@ class QuadlinearInterp(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeY.
         """
         if _isscalar(w):
-            w_pos = max(min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            w_pos = np.max(np.min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             w_pos = self.wSearchFunc(self.w_list, w)
             w_pos[w_pos < 1] = 1
@@ -2077,10 +2077,10 @@ class QuadlinearInterp(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeZ.
         """
         if _isscalar(w):
-            w_pos = max(min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
-            x_pos = max(min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
+            w_pos = np.max(np.min(self.wSearchFunc(self.w_list, w), self.w_n - 1), 1)
+            x_pos = np.max(np.min(self.xSearchFunc(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(self.ySearchFunc(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(self.zSearchFunc(self.z_list, z), self.z_n - 1), 1)
         else:
             w_pos = self.wSearchFunc(self.w_list, w)
             w_pos[w_pos < 1] = 1
@@ -2692,7 +2692,7 @@ class LinearInterpOnInterp1D(HARKinterpolator2D):
         Only called internally by HARKinterpolator2D.__call__ (etc).
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -2723,7 +2723,7 @@ class LinearInterpOnInterp1D(HARKinterpolator2D):
         at each value in x,y. Only called internally by HARKinterpolator2D.derivativeX.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -2754,7 +2754,7 @@ class LinearInterpOnInterp1D(HARKinterpolator2D):
         at each value in x,y. Only called internally by HARKinterpolator2D.derivativeY.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
             dfdy = (
                 self.xInterpolators[y_pos](x) - self.xInterpolators[y_pos - 1](x)
             ) / (self.y_list[y_pos] - self.y_list[y_pos - 1])
@@ -2810,8 +2810,8 @@ class BilinearInterpOnInterp1D(HARKinterpolator3D):
         Only called internally by HARKinterpolator3D.__call__ (etc).
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -2859,8 +2859,8 @@ class BilinearInterpOnInterp1D(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeX.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -2914,8 +2914,8 @@ class BilinearInterpOnInterp1D(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeY.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             beta = (z - self.z_list[z_pos - 1]) / (
                 self.z_list[z_pos] - self.z_list[z_pos - 1]
             )
@@ -2963,8 +2963,8 @@ class BilinearInterpOnInterp1D(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeZ.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -3045,9 +3045,9 @@ class TrilinearInterpOnInterp1D(HARKinterpolator4D):
         Only called internally by HARKinterpolator4D.__call__ (etc).
         """
         if _isscalar(w):
-            x_pos = max(min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (x - self.x_list[x_pos - 1]) / (
                 self.x_list[x_pos] - self.x_list[x_pos - 1]
             )
@@ -3157,9 +3157,9 @@ class TrilinearInterpOnInterp1D(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeW.
         """
         if _isscalar(w):
-            x_pos = max(min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (x - self.x_list[x_pos - 1]) / (
                 self.x_list[x_pos] - self.x_list[x_pos - 1]
             )
@@ -3272,9 +3272,9 @@ class TrilinearInterpOnInterp1D(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeX.
         """
         if _isscalar(w):
-            x_pos = max(min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             beta = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -3367,9 +3367,9 @@ class TrilinearInterpOnInterp1D(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeY.
         """
         if _isscalar(w):
-            x_pos = max(min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (x - self.x_list[x_pos - 1]) / (
                 self.y_list[x_pos] - self.x_list[x_pos - 1]
             )
@@ -3462,9 +3462,9 @@ class TrilinearInterpOnInterp1D(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeZ.
         """
         if _isscalar(w):
-            x_pos = max(min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            x_pos = np.max(np.min(np.searchsorted(self.x_list, x), self.x_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (x - self.x_list[x_pos - 1]) / (
                 self.y_list[x_pos] - self.x_list[x_pos - 1]
             )
@@ -3586,7 +3586,7 @@ class LinearInterpOnInterp2D(HARKinterpolator3D):
         Only called internally by HARKinterpolator3D.__call__ (etc).
         """
         if _isscalar(x):
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (z - self.z_list[z_pos - 1]) / (
                 self.z_list[z_pos] - self.z_list[z_pos - 1]
             )
@@ -3617,7 +3617,7 @@ class LinearInterpOnInterp2D(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeX.
         """
         if _isscalar(x):
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (z - self.z_list[z_pos - 1]) / (
                 self.z_list[z_pos] - self.z_list[z_pos - 1]
             )
@@ -3648,7 +3648,7 @@ class LinearInterpOnInterp2D(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeY.
         """
         if _isscalar(x):
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (z - self.z_list[z_pos - 1]) / (
                 self.z_list[z_pos] - self.z_list[z_pos - 1]
             )
@@ -3679,7 +3679,7 @@ class LinearInterpOnInterp2D(HARKinterpolator3D):
         at each value in x,y,z. Only called internally by HARKinterpolator3D.derivativeZ.
         """
         if _isscalar(x):
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             dfdz = (
                 self.xyInterpolators[z_pos].derivativeX(x, y)
                 - self.xyInterpolators[z_pos - 1].derivativeX(x, y)
@@ -3740,8 +3740,8 @@ class BilinearInterpOnInterp2D(HARKinterpolator4D):
         Only called internally by HARKinterpolator4D.__call__ (etc).
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -3799,8 +3799,8 @@ class BilinearInterpOnInterp2D(HARKinterpolator4D):
         # beginning with w rather than x.  The derivative wrt the first dimension
         # of an element of wxInterpolators is the w-derivative of the main function.
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -3864,8 +3864,8 @@ class BilinearInterpOnInterp2D(HARKinterpolator4D):
         # beginning with w rather than x.  The derivative wrt the second dimension
         # of an element of wxInterpolators is the x-derivative of the main function.
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )
@@ -3925,8 +3925,8 @@ class BilinearInterpOnInterp2D(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeY.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             beta = (z - self.z_list[z_pos - 1]) / (
                 self.z_list[z_pos] - self.z_list[z_pos - 1]
             )
@@ -3975,8 +3975,8 @@ class BilinearInterpOnInterp2D(HARKinterpolator4D):
         at each value in w,x,y,z. Only called internally by HARKinterpolator4D.derivativeZ.
         """
         if _isscalar(x):
-            y_pos = max(min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
-            z_pos = max(min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
+            y_pos = np.max(np.min(np.searchsorted(self.y_list, y), self.y_n - 1), 1)
+            z_pos = np.max(np.min(np.searchsorted(self.z_list, z), self.z_n - 1), 1)
             alpha = (y - self.y_list[y_pos - 1]) / (
                 self.y_list[y_pos] - self.y_list[y_pos - 1]
             )

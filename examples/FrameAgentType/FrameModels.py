@@ -292,7 +292,7 @@ def impute_optimal_decision(self, decision: str) -> None:
             for d in domain:
                 parent_values[decision] = d
                 eu[d] = sum(copy.expected_value(descendant_utility_nodes, parent_values))
-            return max(eu, key=eu.get)  # type: ignore
+            return np.max(eu, key=eu.get)  # type: ignore
 
         self.add_cpds(StochasticFunctionCPD(decision, opt_policy, self, domain=domain, label="opt"))
 '''

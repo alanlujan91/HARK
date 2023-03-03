@@ -25,6 +25,7 @@ from HARK.ConsumptionSaving.ConsIndShockModel import (
 from HARK.utilities import plot_funcs_der, plot_funcs
 from time import time
 
+
 # %%
 def mystr(number):
     return "{:.4f}".format(number)
@@ -132,7 +133,7 @@ LifecycleExample.unpack("cFunc")
 # %%
 # Plot the consumption functions during working life
 print("Consumption functions while working:")
-mMin = min(
+mMin = np.min(
     [LifecycleExample.solution[t].mNrmMin for t in range(LifecycleExample.T_cycle)]
 )
 plot_funcs(LifecycleExample.cFunc[: LifecycleExample.T_retire], mMin, 5)
@@ -166,7 +167,7 @@ CyclicalExample.unpack("cFunc")
 # %%
 # Plot the consumption functions for the cyclical consumer type
 print("Quarterly consumption functions:")
-mMin = min([X.mNrmMin for X in CyclicalExample.solution])
+mMin = np.min([X.mNrmMin for X in CyclicalExample.solution])
 plot_funcs(CyclicalExample.cFunc, mMin, 5)
 
 # %%

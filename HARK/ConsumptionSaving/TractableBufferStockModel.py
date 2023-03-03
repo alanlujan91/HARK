@@ -218,10 +218,10 @@ def add_to_stable_arm_points(
         Damned if I know.
     mLowerBnd : float
         Lower bound on market resources for the backshooting process.  If
-        min(solution_next.mNrm_list) < mLowerBnd, no new bottom point is found.
+        np.min(solution_next.mNrm_list) < mLowerBnd, no new bottom point is found.
     mUpperBnd : float
         Upper bound on market resources for the backshooting process.  If
-        max(solution_next.mNrm_list) > mUpperBnd, no new top point is found.
+        np.max(solution_next.mNrm_list) > mUpperBnd, no new top point is found.
 
     Returns:
     ---------

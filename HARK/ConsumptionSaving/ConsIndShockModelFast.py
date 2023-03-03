@@ -477,7 +477,7 @@ def _prepare_to_solveConsIndShockNumba(
     experience next period.
     """
 
-    # We define aNrmNow all the way from BoroCnstNat up to max(self.aXtraGrid)
+    # We define aNrmNow all the way from BoroCnstNat up to np.max(self.aXtraGrid)
     # even if BoroCnstNat < BoroCnstArt, so we can construct the consumption
     # function as the lower envelope of the (by the artificial borrowing con-
     # straint) uconstrained consumption function, and the artificially con-

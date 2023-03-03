@@ -4,7 +4,7 @@ Created on Sat Dec 19 15:08:54 2020
 @author: Mateo
 """
 
-# %% Preamble
+#  Preamble
 
 import numpy as np
 
@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 
-# %% Tools for setting time-related parameters
+#  Tools for setting time-related parameters
 
 
 def parse_time_params(age_birth, age_death):
@@ -56,7 +56,7 @@ def parse_time_params(age_birth, age_death):
     return {"T_cycle": T_cycle, "T_age": T_age}
 
 
-# %% Tools for finding the mean profiles of permanent income.
+#  Tools for finding the mean profiles of permanent income.
 
 
 def age_log_poly_to_growth_rates(coefs, age_min, age_max):
@@ -191,7 +191,7 @@ def find_profile(GroFacs, Y0):
     return Y
 
 
-# %% Tools for life-cycle profiles of income volatility
+#  Tools for life-cycle profiles of income volatility
 
 # The raw results shared by John Sabelhaus contain the following two
 # sets of estimates (with and without cohor trends), which we will
@@ -425,7 +425,7 @@ def sabelhaus_song_var_profile(age_min=27, age_max=54, cohort=None, smooth=True)
     # We use Sabelhaus and Song (2010) dummies for ages 27-54 and extrapolate
     # outside of that just using the endpoints.
     tran_dummy_interp = LinearInterp(
-        np.arange(min(spec["Ages"]) - 1, max(spec["Ages"]) + 2),
+        np.arange(np.min(spec["Ages"]) - 1, np.max(spec["Ages"]) + 2),
         np.concatenate(
             [[tran_age_dummies[0]], tran_age_dummies, [tran_age_dummies[-1]]]
         ),
@@ -433,7 +433,7 @@ def sabelhaus_song_var_profile(age_min=27, age_max=54, cohort=None, smooth=True)
     )
 
     perm_dummy_interp = LinearInterp(
-        np.arange(min(spec["Ages"]) - 1, max(spec["Ages"]) + 2),
+        np.arange(np.min(spec["Ages"]) - 1, np.max(spec["Ages"]) + 2),
         np.concatenate(
             [[perm_age_dummies[0]], perm_age_dummies, [perm_age_dummies[-1]]]
         ),
@@ -452,7 +452,7 @@ def sabelhaus_song_var_profile(age_min=27, age_max=54, cohort=None, smooth=True)
             + "[1926,1980]. Extrapolating variances."
         )
 
-        cohort = max(min(cohort, 1980), 1926)
+        cohort = np.maximum(np.minimum(cohort, 1980), 1926)
 
     # Construct variances
     # They use 1926 as the base year for cohort effects.
@@ -469,7 +469,7 @@ def sabelhaus_song_var_profile(age_min=27, age_max=54, cohort=None, smooth=True)
     return profiles
 
 
-# %% Encompassing tool to parse full income specifications
+#  Encompassing tool to parse full income specifications
 
 
 def parse_income_spec(
@@ -678,7 +678,7 @@ def parse_income_spec(
     return income_params
 
 
-# %% Income specifications from various papers
+#  Income specifications from various papers
 
 # Processes from Cocco, Gomes, Maenhout (2005):
 # Cocco, J. F., Gomes, F. J., & Maenhout, P. J. (2005). Consumption and

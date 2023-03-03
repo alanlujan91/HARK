@@ -274,8 +274,8 @@ def get_percentiles(data, weights=None, percentiles=None, presorted=False):
     else:
         if (
             not isinstance(percentiles, (list, np.ndarray))
-            or min(percentiles) <= 0
-            or max(percentiles) >= 1
+            or np.min(percentiles) <= 0
+            or np.max(percentiles) >= 1
         ):
             raise ValueError(
                 "Percentiles should be a list or numpy array of floats between 0 and 1"
@@ -333,8 +333,8 @@ def get_lorenz_shares(data, weights=None, percentiles=None, presorted=False):
     else:
         if (
             not isinstance(percentiles, (list, np.ndarray))
-            or min(percentiles) <= 0
-            or max(percentiles) >= 1
+            or np.min(percentiles) <= 0
+            or np.max(percentiles) >= 1
         ):
             raise ValueError(
                 "Percentiles should be a list or numpy array of floats between 0 and 1"
@@ -421,9 +421,9 @@ def kernel_regression(x, y, bot=None, top=None, N=500, h=None):
     y : np.array
         The dependent variable in the kernel regression.
     bot : float
-        Minimum value of interest in the regression; defaults to min(x).
+        Minimum value of interest in the regression; defaults to np.min(x).
     top : float
-        Maximum value of interest in the regression; defaults to max(y).
+        Maximum value of interest in the regression; defaults to np.max(y).
     N : int
         Number of points to compute.
     h : float

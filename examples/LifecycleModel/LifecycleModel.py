@@ -103,7 +103,7 @@ LifeCyclePop.simulate()  # Simulate a population behaving according to this mode
 # Plot the consumption functions during working life
 
 print("Consumption as a function of market resources while working:")
-mMin = min([LifeCyclePop.solution[t].mNrmMin for t in range(LifeCyclePop.T_cycle)])
+mMin = np.min([LifeCyclePop.solution[t].mNrmMin for t in range(LifeCyclePop.T_cycle)])
 plot_funcs(LifeCyclePop.cFunc[: LifeCyclePop.T_retire], mMin, 5)
 
 

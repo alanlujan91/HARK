@@ -18,8 +18,10 @@
 from HARK.ConsumptionSaving.ConsIndShockModel import IndShockConsumerType
 from HARK.utilities import plot_funcs
 
+
 def mystr(number):
     return "{:.4f}".format(number)
+
 
 # %%
 CyclicalDict = {  # Click the arrow to expand this parameter dictionary
@@ -69,7 +71,7 @@ CyclicalExample.solve()
 
 CyclicalExample.unpack_cFunc()
 print("Quarterly consumption functions:")
-mMin = min([X.mNrmMin for X in CyclicalExample.solution])
+mMin = np.min([X.mNrmMin for X in CyclicalExample.solution])
 plot_funcs(CyclicalExample.cFunc, mMin, 5)
 
 # %%
@@ -82,7 +84,7 @@ FiniteCyclicalExample.solve()
 
 FiniteCyclicalExample.unpack("cFunc")
 print("Quarterly consumption functions:")
-mMin = min([X.mNrmMin for X in FiniteCyclicalExample.solution])
+mMin = np.min([X.mNrmMin for X in FiniteCyclicalExample.solution])
 plot_funcs(FiniteCyclicalExample.cFunc, mMin, 5)
 
 # %% [markdown]

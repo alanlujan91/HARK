@@ -155,10 +155,10 @@ def parse_ssa_life_table(
     )
 
     # Find the point at which projections start
-    max_hist = max(hist_tab.index.get_level_values("Year"))
+    max_hist = np.max(hist_tab.index.get_level_values("Year"))
 
     # Warn the user if projections are used.
-    if max(years) > max_hist:
+    if np.max(years) > max_hist:
         message = f"Survival probabilities beyond {max_hist} are projections."
         _log.debug(message)
 

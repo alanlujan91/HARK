@@ -53,6 +53,25 @@ def distance_dict(dict_a, dict_b):
     return np.abs(len_a - len_b)
 
 
+def distance_array(arr_a, arr_b):
+    # If both inputs are array-like, return the maximum absolute difference b/w
+    # corresponding elements (if same shape); return largest difference in dimensions
+    # if shapes do not align.
+
+    if arr_a.shape == arr_b.shape:
+        return np.max(abs(arr_a - arr_b))
+    # Flatten arrays so they have the same dimensions
+    return np.max(abs(arr_a.flatten().shape[0] - arr_b.flatten().shape[0]))
+
+
+def distance_class(thing_a, thing_b):
+    # If none of the above cases, but the objects are of the same class, call
+    # the distance method of one on the other
+    if thing_a.__class__.__name__ == "function":
+        return 0.0
+    return thing_a.distance(thing_b)
+
+
 def distance_metric(thing_a, thing_b):
     """
     A "universal distance" metric that can be used as a default in many settings.
@@ -73,29 +92,21 @@ def distance_metric(thing_a, thing_b):
     type_a = type(thing_a)
     type_b = type(thing_b)
 
+    # If both inputs are numbers, return their difference
+    if isinstance(thing_a, (int, float)) and isinstance(thing_b, (int, float)):
+        return np.abs(thing_a - thing_b)
+
+    if isinstance(thing_a, np.ndarray) and isinstance(thing_b, np.ndarray):
+        return distance_array(thing_a, thing_b)
+
     if type_a is list and type_b is list:
         return distance_list(thing_a, thing_b)
 
     if type_a is dict and type_b is dict:
         return distance_dict(thing_a, thing_b)
 
-    # If both inputs are numbers, return their difference
-    if isinstance(thing_a, (int, float)) and isinstance(thing_b, (int, float)):
-        return np.abs(thing_a - thing_b)
-    # If both inputs are array-like, return the maximum absolute difference b/w
-    # corresponding elements (if same shape); return largest difference in dimensions
-    # if shapes do not align.
-    if hasattr(thing_a, "shape") and hasattr(thing_b, "shape"):
-        if thing_a.shape == thing_b.shape:
-            return np.max(abs(thing_a - thing_b))
-        # Flatten arrays so they have the same dimensions
-        return np.max(abs(thing_a.flatten().shape[0] - thing_b.flatten().shape[0]))
-    # If none of the above cases, but the objects are of the same class, call
-    # the distance method of one on the other
     if thing_a.__class__.__name__ == thing_b.__class__.__name__:
-        if thing_a.__class__.__name__ == "function":
-            return 0.0
-        return thing_a.distance(thing_b)
+        return distance_class(thing_a, thing_b)
 
     # Failsafe: the inputs are very far apart
     return 1000.0
@@ -133,10 +144,9 @@ class MetricObject:
                 obj_b = getattr(other, attr_name)
                 distance_list.append(distance_metric(obj_a, obj_b))
             except AttributeError:
-                distance_list.append(
-                    1000.0
-                )  # if either object lacks attribute, they are not the same
-        return max(distance_list)
+                # if either object lacks attribute, they are not the same
+                distance_list.append(1000.0)
+        return np.max(distance_list)
 
 
 class Model:
