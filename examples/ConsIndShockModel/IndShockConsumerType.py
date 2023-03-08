@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -50,15 +50,15 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # Specifically, this type of consumer receives two income shocks at the beginning of each period: a completely transitory shock $\newcommand{\tShkEmp}{\theta}{\tShkEmp_t}$ and a completely permanent shock $\newcommand{\pShk}{\psi}{\pShk_t}$.  Moreover, the agent is subject to borrowing a borrowing limit: the ratio of end-of-period assets $A_t$ to permanent income $P_t$ must be greater than $\underline{a}$.  As with the perfect foresight problem, this model is stated in terms of *normalized* variables, dividing all real variables by $P_t$:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} {~} u(c_t) + \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(m_{t+1}) \right], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \text{$\underline{a}$}, \\
-# m_{t+1} &=& \Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
-# (\psi_{t+1},\theta_{t+1}) &\sim& F_{t+1}, \\
-# \mathbb{E}[\psi]=\mathbb{E}[\theta] &=& 1, \\
-# u(c) &=& \frac{c^{1-\rho}}{1-\rho}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} {~} u(c_t) + \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(m_{t+1}) \right], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \text{$\underline{a}$}, \\
+# m_{t+1} &= \Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
+# (\psi_{t+1},\theta_{t+1}) &\sim F_{t+1}, \\
+# \mathbb{E}[\psi]=\mathbb{E}[\theta] &= 1, \\
+# u(c) &= \frac{c^{1-\rho}}{1-\rho}.
+# \end{align*}
 
 # %% [markdown]
 # ## Solution method for IndShockConsumerType
@@ -67,21 +67,21 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # Briefly, the transition equation for $m_{t+1}$ can be substituted into the problem definition; the second term of the reformulated maximand represents "end of period value of assets" $\mathfrak{v}_t(a_t)$ ("Gothic v"):
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} {~} u(c_t) + \underbrace{\DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(\Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}) \right]}_{\equiv \mathfrak{v}_t(a_t)}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} {~} u(c_t) + \underbrace{\DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(\Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}) \right]}_{\equiv \mathfrak{v}_t(a_t)}.
+# \end{align*}
 #
 # The first order condition with respect to $c_t$ is thus simply:
 #
-# \begin{eqnarray*}
+# \begin{align*}
 # u^{\prime}(c_t) - \mathfrak{v}'_t(a_t) = 0 \Longrightarrow c_t^{-\CRRA} = \mathfrak{v}'_t(a_t) \Longrightarrow c_t = \mathfrak{v}'_t(a_t)^{-1/\CRRA},
-# \end{eqnarray*}
+# \end{align*}
 #
 # and the marginal value of end-of-period assets can be computed as:
 #
-# \begin{eqnarray*}
+# \begin{align*}
 # \mathfrak{v}'_t(a_t) = \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ \Rfree (\PermGroFac_{t+1}\psi_{t+1})^{-\CRRA} v'_{t+1}(\Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}) \right].
-# \end{eqnarray*}
+# \end{align*}
 #
 # To solve the model, we choose an exogenous grid of $a_t$ values that span the range of values that could plausibly be achieved, compute $\mathfrak{v}'_t(a_t)$ at each of these points, calculate the value of consumption $c_t$ whose marginal utility is consistent with the marginal value of assets, then find the endogenous $m_t$ gridpoint as $m_t = a_t + c_t$.  The set of $(m_t,c_t)$ gridpoints is then interpolated to construct the consumption function.
 
@@ -105,7 +105,7 @@ mystr = lambda number: "{:.4f}".format(number)
 # | $\underline{\theta}$| Transitory shock when unemployed | $\texttt{IncUnemp}$ | $0.3$ |  |
 # | $\mho^{Ret}$ | Probability of being "unemployed" when retired | $\texttt{UnempPrb}$ | $0.0005$ |  |
 # | $\underline{\theta}^{Ret}$| Transitory shock when "unemployed" and retired | $\texttt{IncUnemp}$ | $0.0$ |  |
-# | $(none)$ | Period of the lifecycle model when retirement begins | $\texttt{T_retire}$ | $0$ | |
+# | $(none)$ | Period of the lifecycle model when retirement begins | $\texttt{T\_retire}$ | $0$ | |
 # | $(none)$ | Minimum value in assets-above-minimum grid | $\texttt{aXtraMin}$ | $0.001$ | |
 # | $(none)$ | Maximum value in assets-above-minimum grid | $\texttt{aXtraMax}$ | $20.0$ | |
 # | $(none)$ | Number of points in base assets-above-minimum grid | $\texttt{aXtraCount}$ | $48$ | |
@@ -114,7 +114,7 @@ mystr = lambda number: "{:.4f}".format(number)
 # | $\underline{a}$| Artificial borrowing constraint (normalized) | $\texttt{BoroCnstArt}$ | $0.0$ | |
 # | $(none)$|Indicator for whether $\texttt{vFunc}$ should be computed | $\texttt{vFuncBool}$ | $True$ | |
 # | $(none)$ |Indicator for whether $\texttt{cFunc}$ should use cubic splines | $\texttt{CubicBool}$ | $False$ |  |
-# |$T$| Number of periods in this type's "cycle" |$\texttt{T_cycle}$| $1$ | |
+# |$T$| Number of periods in this type's "cycle" |$\texttt{T\_cycle}$| $1$ | |
 # |(none)| Number of times the "cycle" occurs |$\texttt{cycles}$| $0$ | |
 
 # %% {"code_folding": [0]}
@@ -242,13 +242,13 @@ plot_funcs(IndShockExample.solution[0].cFunc.functions, -0.25, 5.0)
 # | Description | Code | Example value |
 # | :---: | --- | --- |
 # | Number of consumers of this type | $\texttt{AgentCount}$ | $10000$ |
-# | Number of periods to simulate | $\texttt{T_sim}$ | $120$ |
+# | Number of periods to simulate | $\texttt{T\_sim}$ | $120$ |
 # | Mean of initial log (normalized) assets | $\texttt{aNrmInitMean}$ | $-6.0$ |
 # | Stdev of initial log  (normalized) assets | $\texttt{aNrmInitStd}$ | $1.0$ |
 # | Mean of initial log permanent income | $\texttt{pLvlInitMean}$ | $0.0$ |
 # | Stdev of initial log permanent income | $\texttt{pLvlInitStd}$ | $0.0$ |
 # | Aggregrate productivity growth factor | $\texttt{PermGroFacAgg}$ | $1.0$ |
-# | Age after which consumers are automatically killed | $\texttt{T_age}$ | $None$ |
+# | Age after which consumers are automatically killed | $\texttt{T\_age}$ | $None$ |
 #
 # Here, we will simulate 10,000 consumers for 120 periods.  All newly born agents will start with permanent income of exactly $P_t = 1.0 = \exp(\texttt{pLvlInitMean})$, as $\texttt{pLvlInitStd}$ has been set to zero; they will have essentially zero assets at birth, as $\texttt{aNrmInitMean}$ is $-6.0$; assets will be less than $1\%$ of permanent income at birth.
 #

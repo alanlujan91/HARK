@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -49,13 +49,13 @@ from HARK.utilities import plot_funcs
 #
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# V_t(M_t,P_t) &=& \max_{C_t}~U(C_t) + \beta \aleph V_{t+1}(M_{t+1},P_{t+1}), \\
-# & s.t. & \\
-# %A_t &=& M_t - C_t, \\
-# M_{t+1} &=& R (M_{t}-C_{t}) + Y_{t+1}, \\
-# P_{t+1} &=& \Gamma_{t+1} P_t, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V_t(M_t,P_t) &= \max_{C_t}~U(C_t) + \beta \aleph V_{t+1}(M_{t+1},P_{t+1}), \\
+# & s.t.  \\
+# %A_t &= M_t - C_t, \\
+# M_{t+1} &= R (M_{t}-C_{t}) + Y_{t+1}, \\
+# P_{t+1} &= \Gamma_{t+1} P_t, \\
+# \end{align*}
 #
 # A particular perfect foresight agent's problem can be characterized by values of risk aversion $\rho$, discount factor $\beta$, and return factor $R$, along with sequences of income growth factors $\{ \Gamma_t \}$ and survival probabilities $\{\mathsf{\aleph}_t\}$.  To keep things simple, let's forget about "sequences" of income growth and mortality, and just think about an $\textit{infinite horizon}$ consumer with constant income growth and survival probability.
 #
@@ -206,14 +206,14 @@ plot_funcs([PFexample.solution[0].cFunc, NewExample.solution[0].cFunc], 0.0, 10.
 #
 # Specifically, our new type of consumer receives two income shocks at the beginning of each period: a completely transitory shock $\theta_t$ and a completely permanent shock $\psi_t$.  Moreover, lenders will not let the agent borrow money such that his ratio of end-of-period assets $A_t$ to permanent income $P_t$ is less than $\underline{a}$.  As with the perfect foresight problem, this model can be framed in terms of __normalized__ variables, e.g. $m_t \equiv M_t/P_t$.  (See [here](http://www.econ2.jhu.edu/people/ccarroll/papers/BufferStockTheory/) for all the theory).
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} ~ U(c_t) ~ +  \phantom{\LivFac} \beta \mathbb{E} [(\Gamma_{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1}) ], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \underset{\bar{}}{a}, \\
-# m_{t+1} &=& R/(\Gamma_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
-# \mathbb{E}[\psi]=\mathbb{E}[\theta] &=& 1, \\
-# u(c) &=& \frac{c^{1-\rho}}{1-\rho}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} ~ U(c_t) ~ +  \phantom{\LivFac} \beta \mathbb{E} [(\Gamma_{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1}) ], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \underset{\bar{}}{a}, \\
+# m_{t+1} &= R/(\Gamma_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
+# \mathbb{E}[\psi]=\mathbb{E}[\theta] &= 1, \\
+# u(c) &= \frac{c^{1-\rho}}{1-\rho}.
+# \end{align*}
 #
 # HARK represents agents with this kind of problem as instances of the class $\texttt{IndShockConsumerType}$.  To create an $\texttt{IndShockConsumerType}$, we must specify the same set of parameters as for a $\texttt{PerfForesightConsumerType}$, as well as an artificial borrowing constraint $\underline{a}$ and a sequence of income shocks. It's easy enough to pick a borrowing constraint -- say, zero -- but how would we specify the distributions of the shocks?  Can't the joint distribution of permanent and transitory shocks be just about anything?
 #

@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -57,16 +57,16 @@
 # In the most basic formulation, the consumer problem is given as follows. The consumer lives T+1 periods (T $\leq \infty$) and during her lifetime receives the same income $Y$. In each period t (0$\leq$ t$\leq$ T) she can spend it on the consumption $C_t$ or invest in an asset $A_t$ with risk free interest rate R. She maximize the lifetime utility, by solving the following Bellman equation defined on the "cash in hand" state space $M_t = C_t +A_t$:
 #
 # For $t<T+1$
-# \begin{eqnarray*}
-# V_t(M_t) &=& \max_{C_t} U(C_t) + \beta V_{t+1}(M_{t+1}), \\
-# & s.t. & \\
-# A_t &=& M_t - C_t, \\
-# M_{t+1} &=& R (M_{t}-C_{t}) + Y, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V_t(M_t) &= \max_{C_t} U(C_t) + \beta V_{t+1}(M_{t+1}), \\
+# & s.t.  \\
+# A_t &= M_t - C_t, \\
+# M_{t+1} &= R (M_{t}-C_{t}) + Y, \\
+# \end{align*}
 # for $t \geq T+1$
-# \begin{eqnarray*}
-# V_t(M_t) &=& 0
-# \end{eqnarray*}
+# \begin{align*}
+# V_t(M_t) &= 0
+# \end{align*}
 #
 # Where $\beta <1 $ is a discount factor and $U(C)$ is a standard CRRA utility function:
 # $$
@@ -253,9 +253,9 @@ plot_funcs([Example_agent_2.solution[0].vFunc], min_v, max_v)
 # Next step is to simulate the agent behavior. To do so, you first need to set a few parameters for the sake of the simulation:
 #
 # - $\texttt{AgentCount}$: number of simulated agents
-# - $\texttt{T_cycle}$: logical parameter which governs the time flow during the simulation (if it is moving forward or backward)
-# - $\texttt{T_sim}$: number of simulation periods
-# - $\texttt{T_age}$: Age after which simulated agents die with certainty
+# - $\texttt{T\_cycle}$: logical parameter which governs the time flow during the simulation (if it is moving forward or backward)
+# - $\texttt{T\_sim}$: number of simulation periods
+# - $\texttt{T\_age}$: Age after which simulated agents die with certainty
 #
 # Moreover, HARK enables simulation of the model with the log-normal distributions of the initial assets and incomes. You need to set the parameters:
 #
@@ -515,24 +515,24 @@ plt.show()
 #
 # Consumer problem in this setting is:
 #
-# \begin{eqnarray*}
-# V_t(M_t,Y_t) &=& \max_{C_t}~U(C_t) + \beta \pi_t V_{t+1}(M_{t+1},Y_{t+1}), \\
-# & s.t. & \\
-# %A_t &=& M_t - C_t, \\
-# M_{t+1} &=& R (M_{t}-C_{t}) + Y_{t+1}, \\
-# Y_{t+1} &=& \Gamma_{t+1} Y_t, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V_t(M_t,Y_t) &= \max_{C_t}~U(C_t) + \beta \pi_t V_{t+1}(M_{t+1},Y_{t+1}), \\
+# & s.t.  \\
+# %A_t &= M_t - C_t, \\
+# M_{t+1} &= R (M_{t}-C_{t}) + Y_{t+1}, \\
+# Y_{t+1} &= \Gamma_{t+1} Y_t, \\
+# \end{align*}
 #
 # Where $Y_t$ is an age-dependent income, $\pi_t$ is a survival  probability and $\Gamma_{t+1}$ is an income growth rate. Also $\pi_{T+1} =0$
 #
 # While it does not reduce the computational complexity of the problem (as permanent income is deterministic, given its initial condition $Y_0$), HARK represents this problem with normalized variables (represented in lower case), dividing all real variables by permanent income $Y_t$ and utility levels by $Y_t^{1-\rho}$. The Bellman form of the model thus reduces to:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t}~U(c_t) ~+ \beta_{t+1}\pi_{t+1} \Gamma_{t+1}^{1-\rho} v_{t+1}(m_{t+1}), \\
-# & s.t. & \\
-# a_t &=& m_t - c_t, \\
-# m_{t+1} &=&  R / \Gamma_{t+1} a_t + 1.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t}~U(c_t) ~+ \beta_{t+1}\pi_{t+1} \Gamma_{t+1}^{1-\rho} v_{t+1}(m_{t+1}), \\
+# & s.t.  \\
+# a_t &= m_t - c_t, \\
+# m_{t+1} &=  R / \Gamma_{t+1} a_t + 1.
+# \end{align*}
 #
 # To solve this problem we need to study the **cycles** parameter more carefully. There is a notebook dedicated to solving and simulating life-cycle models which can be found here: [Cycles_tutorial](https://github.com/econ-ark/HARK/blob/master/examples/LifecycleModel/Cycles_tutorial.ipynb).
 #

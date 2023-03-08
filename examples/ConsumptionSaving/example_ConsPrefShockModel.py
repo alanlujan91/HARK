@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -42,14 +42,14 @@ do_simulation = True
 #
 # The agent's problem can be written in (normalized) Bellman form as:
 #
-# \begin{eqnarray*}
-# v_t(m_t,\eta_t) &=& \max_{c_t} u(\eta_t.c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [(\Gamma_{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1}, \eta_{t+1}) ], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# m_{t+1} &=& R/(\Gamma_{t+1}\psi_{t+1}) a_t + \theta_{t+1}, \\
-# \psi_{t},\theta_{t} \sim F_{t}, &\qquad& \mathbb{E} [F_{\psi t}] = 1, \\
-# u(c) &=& \frac{c^{1-\rho}}{1-\rho}, \eta_t \sim F_{\eta t}
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t,\eta_t) &= \max_{c_t} u(\eta_t.c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [(\Gamma_{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1}, \eta_{t+1}) ], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# m_{t+1} &= R/(\Gamma_{t+1}\psi_{t+1}) a_t + \theta_{t+1}, \\
+# \psi_{t},\theta_{t} \sim F_{t}, &\qquad \mathbb{E} [F_{\psi t}] = 1, \\
+# u(c) &= \frac{c^{1-\rho}}{1-\rho}, \eta_t \sim F_{\eta t}
+# \end{align*}
 #
 
 # %% [markdown]

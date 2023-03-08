@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -67,12 +67,12 @@
 #
 # As you have found this journey, you probably have a concept of what a heterogeneous agent model is, but here is a short recap. Think about a basic, infinitely lived consumer problem as you know from first-year graduate courses (letting alone the companies and general equilibrium for now). Using the Bellman equation, we can write it as:
 #
-# \begin{eqnarray*}
-# V(M_t) &=& \max_{C_t} U(C_t) + \beta V(M_{t+1}), \\
-# & s.t. & \\
-# A_t &=& M_t - C_t, \\
-# M_{t+1} &=& R (M_{t}-C_{t}) + Y_t, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V(M_t) &= \max_{C_t} U(C_t) + \beta V(M_{t+1}), \\
+# & s.t.  \\
+# A_t &= M_t - C_t, \\
+# M_{t+1} &= R (M_{t}-C_{t}) + Y_t, \\
+# \end{align*}
 #
 #
 # Where $\beta <1$ is a discount factor, $C_t$ is consumption, $A_t$ - assets, $Y_t$ - income and $U(C)$ is a standard CRRA utility function:
@@ -85,12 +85,12 @@
 #
 # Then, the Bellman equation looks like:
 #
-# \begin{eqnarray*}
-# V(M_t, Y_t) &=& \max_{C_t} U(C_t) + E[\beta V(M_{t+1}, Y_{t+1})], \\
-# & s.t. & \\
-# A_t &=& M_t - C_t, \\
-# M_{t+1} &=& R (M_{t}-C_{t}) + Y_t, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V(M_t, Y_t) &= \max_{C_t} U(C_t) + E[\beta V(M_{t+1}, Y_{t+1})], \\
+# & s.t.  \\
+# A_t &= M_t - C_t, \\
+# M_{t+1} &= R (M_{t}-C_{t}) + Y_t, \\
+# \end{align*}
 #
 # Finding a distribution of agent assets (consumption, savings) must involve much more advanced numerical tools than in the representative agent setting. This is more demanding task to accomplish and master. Moreover, the knowledge about involved numerical methods is less systematic, and often hard to find. To quote the HARK [Documentation](https://hark.readthedocs.io/en/latest/introduction.html):
 #
@@ -153,12 +153,12 @@
 # ### 4.1 Introductory example
 # As an example, let's solve the stochastic model from the introduction. Assume the income process of the agent $i$ in the period t, $Y_{i,t}$, is given by:
 #
-# \begin{eqnarray*}
-# Y_{i,t}  &=& \varepsilon_t(\theta_{i,t} p_{i,t}) \\
-# p_{i,t+1} &=& p_{i,t}\psi_{i,t+1}\\
-# \psi_{i,t} & \sim & N(1,\sigma_{\varrho})\\
-# \theta_{i,t} & \sim & N(1,\sigma_{\theta})\\
-# \end{eqnarray*}
+# \begin{align*}
+# Y_{i,t}  &= \varepsilon_t(\theta_{i,t} p_{i,t}) \\
+# p_{i,t+1} &= p_{i,t}\psi_{i,t+1}\\
+# \psi_{i,t} & \sim  N(1,\sigma_{\varrho})\\
+# \theta_{i,t} & \sim  N(1,\sigma_{\theta})\\
+# \end{align*}
 #
 # To get a universal solution of this problem, we need to find a policy function (in this case consumption function). This can be done easily using the HARK `solve` function.
 #
@@ -239,13 +239,13 @@ plot_funcs([Example.solution[0].cFunc], min_v, max_v)
 #
 # Let's extend our model from the previous section. Assume the perfect competition and Cobb-Douglas production function:
 #
-# \begin{eqnarray*}
+# \begin{align*}
 # y_t = k_t^{\alpha} n_t^{1-\alpha}
-# \end{eqnarray*}
+# \end{align*}
 # Thus, the producers' problem is:
-# \begin{eqnarray*}
+# \begin{align*}
 # \max_{k_t, n_t} &\: k_t^{\alpha} n_t^{1-\alpha} - (R_t +\delta)k_t-w_t n_t
-# \end{eqnarray*}
+# \end{align*}
 #
 # Where $k_t$ is capital, $n_t$ is labour, $\delta$ is a depreciation rate.
 #
@@ -253,19 +253,19 @@ plot_funcs([Example.solution[0].cFunc], min_v, max_v)
 #
 # [comment]: <> (Should there be an equation here? Or is this information apparent from the bellman equation?)
 #
-# \begin{eqnarray*}
-# V(M_{i,t}, Y_{i,t}) &=& \max_{C_{i,t}, M_{i,t+1}} U(C_{i,t}) + E[\beta V(M_{i,t+1}, Y_{i,t+1})], \\
-# & s.t. & \\
-# A_{i,t} &=& M_{i,t} - C_{i,t}, \\
-# M_{i,t+1} &=& R_{t+1} (M_{i,t}-C_{i,t}) + w_{t+1} Y_{i,t+1}, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V(M_{i,t}, Y_{i,t}) &= \max_{C_{i,t}, M_{i,t+1}} U(C_{i,t}) + E[\beta V(M_{i,t+1}, Y_{i,t+1})], \\
+# & s.t.  \\
+# A_{i,t} &= M_{i,t} - C_{i,t}, \\
+# M_{i,t+1} &= R_{t+1} (M_{i,t}-C_{i,t}) + w_{t+1} Y_{i,t+1}, \\
+# \end{align*}
 #
 # Additionally, assume that the distribution of the consumers over capital is given by the measure $\Gamma_t$. To close the economy, there are the market clearing conditions:
-# \begin{eqnarray*}
+# \begin{align*}
 # n_t &= \int Y{_i,t} d \Gamma_t \\
 # k_{t+1} &= \int A_{i,t}^i d \Gamma_t \\
 # k_{t+1}+ \int C_{i,t} d\Gamma_t &= y_t+(1-\delta)k_t
-# \end{eqnarray*}
+# \end{align*}
 #
 # In HARK, you can solve this basic case by using the `CobbDouglasEconomy` class. However, to add the consumers to the economy you need the `AggShockConsumerType` class, which is a subclass of `IndShockConsumerType` Let's declare the economy (assuming depreciation rate $\delta = 0.025$):
 #
@@ -308,12 +308,12 @@ plot_funcs(
 #
 # Nevertheless, both basic classes enable the aggregate fluctuation in the economy, that is:
 #
-# \begin{eqnarray*}
-# Y_{i,t}  &=& \varepsilon_t(\epsilon_{i,t}p_{i,t}\Theta_t P_t )\\
-# P_{t+1} &=& P_{t}\Psi_{t+1}\\
-# \Psi_{t}  &\sim & {N}(1,\sigma_{\Psi})\\
-# \Theta_t  &\sim &{N}(1,\sigma_{\Theta})\\
-# \end{eqnarray*}
+# \begin{align*}
+# Y_{i,t}  &= \varepsilon_t(\epsilon_{i,t}p_{i,t}\Theta_t P_t )\\
+# P_{t+1} &= P_{t}\Psi_{t+1}\\
+# \Psi_{t}  &\sim  {N}(1,\sigma_{\Psi})\\
+# \Theta_t  &\sim {N}(1,\sigma_{\Theta})\\
+# \end{align*}
 #
 # The consumers, which are attributes of such market classes, need to include the aggregate fluctuations of the whole economy in their optimization problem. This is the reason why the `AggShockConsumerType` class (and their subclasses) must be used to construct the macro-model.
 #

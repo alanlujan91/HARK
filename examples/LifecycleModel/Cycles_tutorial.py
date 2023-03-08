@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -35,13 +35,13 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # Recall the deterministic, life-cycle version of the perfect foresight model such that it accomodates age-dependent survival probability and/or income growth.
 #
-# \begin{eqnarray*}
-# V_t(M_t,Y_t) &=& \max_{C_t}~U(C_t) + \beta \pi_t V_{t+1}(M_{t+1},Y_{t+1}), \\
-# & s.t. & \\
-# %A_t &=& M_t - C_t, \\
-# M_{t+1} &=& R (M_{t}-C_{t}) + Y_{t+1}, \\
-# Y_{t+1} &=& \Gamma_{t+1} Y_t, \\
-# \end{eqnarray*}
+# \begin{align*}
+# V_t(M_t,Y_t) &= \max_{C_t}~U(C_t) + \beta \pi_t V_{t+1}(M_{t+1},Y_{t+1}), \\
+# & s.t.  \\
+# %A_t &= M_t - C_t, \\
+# M_{t+1} &= R (M_{t}-C_{t}) + Y_{t+1}, \\
+# Y_{t+1} &= \Gamma_{t+1} Y_t, \\
+# \end{align*}
 #
 # Where $Y_t$ is an age-dependent income, $\pi_t$ is a survival  probability and $\Gamma_{t+1}$ is an income growth rate. Also $\pi_{T+1} =0$.
 

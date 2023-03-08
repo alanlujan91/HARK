@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -63,27 +63,27 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# V_t(M_t,P_t) &=& \max_{C_t}~U(C_t) ~+ \DiscFac (1 - \DiePrb_{t+1}) V_{t+1}(M_{t+1},P_{t+1}), \\
-# & s.t. & \\
-# A_t &=& M_t - C_t, \\
-# A_t/P_t &\geq& \underline{a}, \\
-# M_{t+1} &=& \Rfree A_t + Y_{t+1}, \\
-# Y_{t+1} &=& P_{t+1}, \\
-# P_{t+1} &=& \PermGroFac_{t+1} P_t.
-# \end{eqnarray*}
+# \begin{align*}
+# V_t(M_t,P_t) &= \max_{C_t}~U(C_t) ~+ \DiscFac (1 - \DiePrb_{t+1}) V_{t+1}(M_{t+1},P_{t+1}), \\
+# & s.t.  \\
+# A_t &= M_t - C_t, \\
+# A_t/P_t &\geq \underline{a}, \\
+# M_{t+1} &= \Rfree A_t + Y_{t+1}, \\
+# Y_{t+1} &= P_{t+1}, \\
+# P_{t+1} &= \PermGroFac_{t+1} P_t.
+# \end{align*}
 #
 # The consumer's problem is characterized by a coefficient of relative risk aversion $\CRRA$, an intertemporal discount factor $\DiscFac$, an interest factor $\Rfree$, and age-varying sequences of the permanent income growth factor $\PermGroFac_t$ and survival probability $(1 - \DiePrb_t)$.
 #
 # While it does not reduce the computational complexity of the problem (as permanent income is deterministic, given its initial condition $P_0$), HARK represents this problem with *normalized* variables (represented in lower case), dividing all real variables by permanent income $P_t$ and utility levels by $P_t^{1-\CRRA}$.  The Bellman form of the model thus reduces to:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t}~U(c_t) ~+ \DiscFac (1 - \DiePrb_{t+1}) \PermGroFac_{t+1}^{1-\CRRA} v_{t+1}(m_{t+1}), \\
-# & s.t. & \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# m_{t+1} &=& \Rfree/\PermGroFac_{t+1} a_t + 1.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t}~U(c_t) ~+ \DiscFac (1 - \DiePrb_{t+1}) \PermGroFac_{t+1}^{1-\CRRA} v_{t+1}(m_{t+1}), \\
+# & s.t.  \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# m_{t+1} &= \Rfree/\PermGroFac_{t+1} a_t + 1.
+# \end{align*}
 
 # %% [markdown]
 # ## Solution method for PerfForesightConsumerType
@@ -104,7 +104,7 @@ mystr = lambda number: "{:.4f}".format(number)
 # |$\PermGroFac_{t+1}$|Permanent income growth factor|$\texttt{PermGroFac}$| $[1.01]$ | $\surd$ |
 # |$\underline{a}$|Artificial borrowing constraint|$\texttt{BoroCnstArt}$| $None$ |  |
 # |$(none)$|Maximum number of gridpoints in consumption function |$\texttt{aXtraCount}$| $200$ |  |
-# |$T$| Number of periods in this type's "cycle" |$\texttt{T_cycle}$| $1$ | |
+# |$T$| Number of periods in this type's "cycle" |$\texttt{T\_cycle}$| $1$ | |
 # |(none)| Number of times the "cycle" occurs |$\texttt{cycles}$| $0$ | |
 #
 # Note that the survival probability and income growth factor have time subscripts; likewise, the example values for these parameters are *lists* rather than simply single floats.  This is because those parameters are *time-varying*: their values can depend on which period of the problem the agent is in.  All time-varying parameters *must* be specified as lists, even if the same value occurs in each period for this type.
@@ -113,7 +113,7 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # The last two parameters in the table specify the "nature of time" for this type: the number of (non-terminal) periods in this type's "cycle", and the number of times that the "cycle" occurs.  *Every* subclass of `AgentType` uses these two code parameters to define the nature of time.  Here, `T_cycle` has the value $1$, indicating that there is exactly one period in the cycle, while `cycles` is $0$, indicating that the cycle is repeated in *infinite* number of times-- it is an infinite horizon model, with the same "kind" of period repeated over and over.
 #
-# In contrast, we could instead specify a life-cycle model by setting `T_cycle` to $1$, and specifying age-varying sequences of income growth and survival probability.  In all cases, the number of elements in each time-varying parameter should exactly equal $\texttt{T_cycle}$.
+# In contrast, we could instead specify a life-cycle model by setting `T_cycle` to $1$, and specifying age-varying sequences of income growth and survival probability.  In all cases, the number of elements in each time-varying parameter should exactly equal $\texttt{T\_cycle}$.
 #
 # The parameter $\texttt{AgentCount}$ specifies how many consumers there are of this *type*-- how many individuals have these exact parameter values and are *ex ante* homogeneous.  This information is not relevant for solving the model, but is needed in order to simulate a population of agents, introducing *ex post* heterogeneity through idiosyncratic shocks.  Of course, simulating a perfect foresight model is quite boring, as there are *no* idiosyncratic shocks other than death!
 #
@@ -188,7 +188,7 @@ LiqConstrExample.solve()
 print("Liquidity constrained perfect foresight consumption function:")
 plot_funcs(LiqConstrExample.solution[0].cFunc, 0.0, 10.0)
 
-# %% {"incorrectly_encoded_metadata": "pycharm= [markdown] {\"name\": \"#%% md\\n\"}"}
+# %% [markdown] {"incorrectly_encoded_metadata": "pycharm= [markdown] {\"name\": \"#%% md\\n\"}"}
 # At this time, the value function for a perfect foresight consumer with an artificial borrowing constraint is not computed nor included as part of its $\texttt{solution}$.
 
 # %% [markdown]
@@ -203,19 +203,19 @@ plot_funcs(LiqConstrExample.solution[0].cFunc, 0.0, 10.0)
 # | Description | Code | Example value |
 # | :---: | --- | --- |
 # | Number of consumers of this type | $\texttt{AgentCount}$ | $10000$ |
-# | Number of periods to simulate | $\texttt{T_sim}$ | $120$ |
+# | Number of periods to simulate | $\texttt{T\_sim}$ | $120$ |
 # | Mean of initial log (normalized) assets | $\texttt{aNrmInitMean}$ | $-6.0$ |
 # | Stdev of initial log  (normalized) assets | $\texttt{aNrmInitStd}$ | $1.0$ |
 # | Mean of initial log permanent income | $\texttt{pLvlInitMean}$ | $0.0$ |
 # | Stdev of initial log permanent income | $\texttt{pLvlInitStd}$ | $0.0$ |
 # | Aggregrate productivity growth factor | $\texttt{PermGroFacAgg}$ | $1.0$ |
-# | Age after which consumers are automatically killed | $\texttt{T_age}$ | $None$ |
+# | Age after which consumers are automatically killed | $\texttt{T\_age}$ | $None$ |
 #
 # We have specified the model so that initial assets and permanent income are both distributed lognormally, with mean and standard deviation of the underlying normal distributions provided by the user.
 #
 # The parameter $\texttt{PermGroFacAgg}$ exists for compatibility with more advanced models that employ aggregate productivity shocks; it can simply be set to 1.
 #
-# In infinite horizon models, it might be useful to prevent agents from living extraordinarily long lives through a fortuitous sequence of mortality shocks.  We have thus provided the option of setting $\texttt{T_age}$ to specify the maximum number of periods that a consumer can live before they are automatically killed (and replaced with a new consumer with initial state drawn from the specified distributions).  This can be turned off by setting it to `None`.
+# In infinite horizon models, it might be useful to prevent agents from living extraordinarily long lives through a fortuitous sequence of mortality shocks.  We have thus provided the option of setting $\texttt{T\_age}$ to specify the maximum number of periods that a consumer can live before they are automatically killed (and replaced with a new consumer with initial state drawn from the specified distributions).  This can be turned off by setting it to `None`.
 #
 # The cell below puts these parameters into a dictionary, then gives them to `PFexample`.  Note that all of these parameters *could* have been passed as part of the original dictionary; we omitted them above for simplicity.
 
@@ -240,7 +240,7 @@ PFexample.assign_parameters(**SimulationParams)
 #
 # ### Generating simulated data
 #
-# Before simulating, the `initialize_sim` method must be invoked.  This resets our instance back to its initial state, drawing a set of initial $\texttt{aNrm}$ and $\texttt{pLvl}$ values from the specified distributions and storing them in the attributes $\texttt{aNrmNow_init}$ and $\texttt{pLvlNow_init}$.  It also resets this instance's internal random number generator, so that the same initial states will be set every time `initialize_sim` is called.  In models with non-trivial shocks, this also ensures that the same sequence of shocks will be generated on every simulation run.
+# Before simulating, the `initialize_sim` method must be invoked.  This resets our instance back to its initial state, drawing a set of initial $\texttt{aNrm}$ and $\texttt{pLvl}$ values from the specified distributions and storing them in the attributes $\texttt{aNrmNow\_init}$ and $\texttt{pLvlNow\_init}$.  It also resets this instance's internal random number generator, so that the same initial states will be set every time `initialize_sim` is called.  In models with non-trivial shocks, this also ensures that the same sequence of shocks will be generated on every simulation run.
 #
 # Finally, the `simulate` method can be called.
 
@@ -249,8 +249,8 @@ PFexample.track_vars = ["mNrm"]
 PFexample.initialize_sim()
 PFexample.simulate()
 
-# %% {"incorrectly_encoded_metadata": "pycharm= [markdown] {\"name\": \"#%% md\\n\"}"}
-# Each simulation variable $\texttt{X}$ named in $\texttt{track_vars}$ will have the *history* of that variable for each agent stored in the attribute $\texttt{X_hist}$ as an array of shape $(\texttt{T_sim},\texttt{AgentCount})$.  To see that the simulation worked as intended, we can plot the mean of $m_t$ in each simulated period:
+# %% [markdown] {"incorrectly_encoded_metadata": "pycharm= [markdown] {\"name\": \"#%% md\\n\"}"}
+# Each simulation variable $\texttt{X}$ named in $\texttt{track\_vars}$ will have the *history* of that variable for each agent stored in the attribute $\texttt{X\_hist}$ as an array of shape $(\texttt{T\_sim},\texttt{AgentCount})$.  To see that the simulation worked as intended, we can plot the mean of $m_t$ in each simulated period:
 
 # %% {"pycharm": {"name": "#%%\n"}}
 plt.plot(np.mean(PFexample.history["mNrm"], axis=1))
@@ -261,7 +261,7 @@ plt.show()
 # %% [markdown] {"incorrectly_encoded_metadata": "pycharm= [markdown] {\"name\": \"#%% md\\n\"}"}
 # A perfect foresight consumer can borrow against the PDV of his future income-- his human wealth-- and thus as time goes on, our simulated agents approach the (very negative) steady state level of $m_t$ while being steadily replaced with consumers with roughly $m_t=1$.
 #
-# The slight wiggles in the plotted curve are due to consumers randomly dying and being replaced; their replacement will have an initial state drawn from the distributions specified by the user.  To see the current distribution of ages, we can look at the attribute $\texttt{t_age}$.
+# The slight wiggles in the plotted curve are due to consumers randomly dying and being replaced; their replacement will have an initial state drawn from the distributions specified by the user.  To see the current distribution of ages, we can look at the attribute $\texttt{T\_age}$.
 
 # %% {"pycharm": {"name": "#%%\n"}}
 N = PFexample.AgentCount
@@ -276,7 +276,7 @@ plt.show()
 #
 # One might wonder why HARK requires users to call `initialize_sim` before calling `simulate`: Why doesn't `simulate` just call `initialize_sim` as its first step?  We have broken up these two steps so that users can simulate some number of periods, change something in the environment, and then resume the simulation.
 #
-# When called with no argument, `simulate` will simulate the model for $\texttt{T_sim}$ periods.  The user can optionally pass an integer specifying the number of periods to simulate (which should not exceed $\texttt{T_sim}$).
+# When called with no argument, `simulate` will simulate the model for $\texttt{T\_sim}$ periods.  The user can optionally pass an integer specifying the number of periods to simulate (which should not exceed $\texttt{T\_sim}$).
 #
 # In the cell below, we simulate our perfect foresight consumers for 80 periods, then seize a bunch of their assets (dragging their wealth even more negative), then simulate for the remaining 40 periods.
 #

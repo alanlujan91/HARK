@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -67,15 +67,15 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # Specifically, this type of consumer receives two income shocks at the beginning of each period: a completely transitory shock $\newcommand{\tShkEmp}{\theta}{\tShkEmp_t}$ and a completely permanent shock $\newcommand{\pShk}{\psi}{\pShk_t}$.  Moreover, the agent is subject to borrowing a borrowing limit: the ratio of end-of-period assets $A_t$ to permanent income $P_t$ must be greater than $\underline{a}$.  As with the perfect foresight problem, this model is stated in terms of *normalized* variables, dividing all real variables by $P_t$:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} {~} u(c_t) + \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(m_{t+1}) \right], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \text{$\underline{a}$}, \\
-# m_{t+1} &=& \Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
-# (\psi_{t+1},\theta_{t+1}) &\sim& F_{t+1}, \\
-# \mathbb{E}[\psi]=\mathbb{E}[\theta] &=& 1, \\
-# u(c) &=& \frac{c^{1-\rho}}{1-\rho}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} {~} u(c_t) + \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(m_{t+1}) \right], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \text{$\underline{a}$}, \\
+# m_{t+1} &= \Rfree/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
+# (\psi_{t+1},\theta_{t+1}) &\sim F_{t+1}, \\
+# \mathbb{E}[\psi]=\mathbb{E}[\theta] &= 1, \\
+# u(c) &= \frac{c^{1-\rho}}{1-\rho}.
+# \end{align*}
 
 # %% [markdown]
 # ## Solving and examining the solution of the idiosyncratic income shocks model

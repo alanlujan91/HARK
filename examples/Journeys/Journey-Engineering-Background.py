@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -70,14 +70,14 @@
 #
 # In the economic analysis, one of the most used problems are "consumers problems" which are designed to model the consumer choices. In this class of problems consumers need to find the optimal set of goods given her resources. In the basic formulation of the problem there is only one good but can be consumed in different time periods (let us denote it by $C_t$, where $0\leq t\leq T\leq \infty$ denotes periods). Consumer receives some resources $w_t$ (think wages), which she can invest with interest rate $R$ (denote the investments by $A_t$) or consume. The utility of the consumption in the period $t=0$ is given by function $U()$, for the next periods it is given by the function $\beta^t U ()$ as consumer prefer consumption now then in the future, $\beta<1$. The consumption problem can be then formalize by the maximization problem:
 #
-# \begin{eqnarray*}
+# \begin{align*}
 #  \max_{C_t}&  \sum_{t=0}^T \beta^t U(C_t)
-# \end{eqnarray*}
+# \end{align*}
 #
 # With the condition in each t:
-# \begin{eqnarray*}
+# \begin{align*}
 # C_t + A_{t+1} = w_t+RA_t
-# \end{eqnarray*}
+# \end{align*}
 #
 # U is typically assumed to be a constant risk aversion function:
 # $$

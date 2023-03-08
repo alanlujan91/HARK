@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -35,16 +35,16 @@ do_simulation = True
 # %% [markdown]
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# v_t(M_t,p_t, medShk_t) &=& \max_{c_t, med_t} U(c_t, med_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(M_{t+1}, p_{t+1}, medShk_{t+1})], \\
-# a_t &=& M_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# M_{t+1} &=& R a_t + \theta_{t+1}, \\
-# p_{t+1} &=& \gimel_{t+1}(p_t)\psi_{t+1}, \\
-# medShk_{t+1} &=&   ,\\
-# \psi_t \sim F_{\psi t} &\qquad&  \theta_t \sim F_{\theta t}, \mathbb{E} [F_{\psi t}] = 1, \\
-# U(c, med) &=& \frac{c^{1-\rho}}{1-\rho}\frac{med^{1-\rho_{med}}}{1-\rho_{med}}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(M_t,p_t, medShk_t) &= \max_{c_t, med_t} U(c_t, med_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(M_{t+1}, p_{t+1}, medShk_{t+1})], \\
+# a_t &= M_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# M_{t+1} &= R a_t + \theta_{t+1}, \\
+# p_{t+1} &= \gimel_{t+1}(p_t)\psi_{t+1}, \\
+# medShk_{t+1} &=   ,\\
+# \psi_t \sim F_{\psi t} &\qquad  \theta_t \sim F_{\theta t}, \mathbb{E} [F_{\psi t}] = 1, \\
+# U(c, med) &= \frac{c^{1-\rho}}{1-\rho}\frac{med^{1-\rho_{med}}}{1-\rho_{med}}.
+# \end{align*}
 
 # %% [markdown]
 # The one period problem for this model is solved by the function $\texttt{solveConsMedShock}$, which creates an instance of the class $\texttt{ConsMedShockSolver}$. The class $\texttt{MedShockConsumerType}$ extends $\texttt{PersistentShockConsumerType}$ from $\texttt{GenIncProcessModel}$ to represents agents in this model.

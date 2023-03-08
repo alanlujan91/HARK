@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -56,17 +56,17 @@ mystr = lambda number: "{:.4f}".format(number)
 #
 # Continuing to work with *normalized* variables (e.g. $m_t$ represents the level of market resources divided by permanent income), the "kinked R" model can be stated as:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} {~} U(c_t) + \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(m_{t+1}) \right], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# m_{t+1} &=& \Rfree_t/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
-# \Rfree_t &=& \cases{\Rfree_{boro} \texttt{ if } a_t < 0 \\
-#                     \Rfree_{save} \texttt{ if } a_t \geq 0},\\
-# \Rfree_{boro} &>& \Rfree_{save}, \\
-# (\psi_{t+1},\theta_{t+1}) &\sim& F_{t+1}, \\
-# \mathbb{E}[\psi]=\mathbb{E}[\theta] &=& 1.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} {~} U(c_t) + \DiscFac (1-\DiePrb_{t+1})  \mathbb{E}_{t} \left[ (\PermGroFac_{t+1}\psi_{t+1})^{1-\CRRA} v_{t+1}(m_{t+1}) \right], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# m_{t+1} &= \Rfree_t/(\PermGroFac_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
+# \Rfree_t &= \begin{cases}\Rfree_{boro} \texttt{ if } a_t < 0 \\
+#                     \Rfree_{save} \texttt{ if } a_t \geq 0 \end{cases},\\
+# \Rfree_{boro} &> \Rfree_{save}, \\
+# (\psi_{t+1},\theta_{t+1}) &\sim F_{t+1}, \\
+# \mathbb{E}[\psi]=\mathbb{E}[\theta] &= 1.
+# \end{align*}
 
 # %% [markdown]
 # ## Solving the "kinked R" model
@@ -98,7 +98,7 @@ mystr = lambda number: "{:.4f}".format(number)
 # | $\underline{\theta} $ | Transitory shock when unemployed | $\texttt{IncUnemp}$ | $0.3$ |  |
 # | $\mho^{Ret}$ | Probability of being "unemployed" when retired | $\texttt{UnempPrb}$ | $0.0005$ |  |
 # | $\underline{\theta}^{Ret} $ | Transitory shock when "unemployed" and retired | $\texttt{IncUnemp}$ | $0.0$ |  |
-# | $(none)$ | Period of the lifecycle model when retirement begins | $\texttt{T_retire}$ | $0$ | |
+# | $(none)$ | Period of the lifecycle model when retirement begins | $\texttt{T\_retire}$ | $0$ | |
 # | $(none)$ | Minimum value in assets-above-minimum grid | $\texttt{aXtraMin}$ | $0.001$ | |
 # | $(none)$ | Maximum value in assets-above-minimum grid | $\texttt{aXtraMax}$ | $20.0$ | |
 # | $(none)$ | Number of points in base assets-above-minimum grid | $\texttt{aXtraCount}$ | $48$ | |
@@ -107,7 +107,7 @@ mystr = lambda number: "{:.4f}".format(number)
 # | $\underline{a} $ | Artificial borrowing constraint (normalized) | $\texttt{BoroCnstArt}$ | $None$ | |
 # | $(none) $ |Indicator for whether $\texttt{vFunc}$ should be computed | $\texttt{vFuncBool}$ | $True$ | |
 # | $(none)$ |Indicator for whether $\texttt{cFunc}$ should use cubic splines | $\texttt{CubicBool}$ | $False$ |  |
-# |$T$| Number of periods in this type's "cycle" |$\texttt{T_cycle}$| $1$ | |
+# |$T$| Number of periods in this type's "cycle" |$\texttt{T\_cycle}$| $1$ | |
 # |(none)| Number of times the "cycle" occurs |$\texttt{cycles}$| $0$ | |
 #
 # These example parameters are almost identical to those used for `IndShockExample` in the prior notebook, except that the interest rate on borrowing is 20% (like a credit card), and the interest rate on saving is 1%. Moreover, the artificial borrowing constraint has been set to `None`.  The cell below defines a parameter dictionary with these example values.
@@ -185,13 +185,13 @@ plot_funcs_der(KinkyExample.solution[0].cFunc, KinkyExample.solution[0].mNrmMin,
 # | Description | Code | Example value |
 # | :---: | --- | --- |
 # | Number of consumers of this type | $\texttt{AgentCount}$ | $10000$ |
-# | Number of periods to simulate | $\texttt{T_sim}$ | $500$ |
+# | Number of periods to simulate | $\texttt{T\_sim}$ | $500$ |
 # | Mean of initial log (normalized) assets | $\texttt{aNrmInitMean}$ | $-6.0$ |
 # | Stdev of initial log  (normalized) assets | $\texttt{aNrmInitStd}$ | $1.0$ |
 # | Mean of initial log permanent income | $\texttt{pLvlInitMean}$ | $0.0$ |
 # | Stdev of initial log permanent income | $\texttt{pLvlInitStd}$ | $0.0$ |
 # | Aggregrate productivity growth factor | $\texttt{PermGroFacAgg}$ | $1.0$ |
-# | Age after which consumers are automatically killed | $\texttt{T_age}$ | $None$ |
+# | Age after which consumers are automatically killed | $\texttt{T\_age}$ | $None$ |
 #
 # Here, we will simulate 10,000 consumers for 500 periods.  All newly born agents will start with permanent income of exactly $P_t = 1.0 = \exp(\texttt{pLvlInitMean})$, as $\texttt{pLvlInitStd}$ has been set to zero; they will have essentially zero assets at birth, as $\texttt{aNrmInitMean}$ is $-6.0$; assets will be less than $1\%$ of permanent income at birth.
 #

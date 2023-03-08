@@ -8,7 +8,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -35,15 +35,15 @@ do_simulation = True
 #
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# v_t(m_t,s_t) &=& \max_{c_t} u(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(m_{t+1}, s_{t+1}) ], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# m_{t+1} &=& \frac{R(s_{t+1})}{\Gamma(s_{t+1})\psi_{t+1}} a_t + \theta_{t+1}, \\
-# \theta_{t} \sim F_{\theta t}(s_t), &\qquad& \psi_{t} \sim F_{\psi t}(s_t), \mathbb{E} [F_{\psi t}(s_t)] = 1, \\
-# Prob[s_{t+1}=j| s_t=i] &=& \triangle_{ij}, \\
-# u(c) &=& \frac{c^{1-\rho}}{1-\rho}
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t,s_t) &= \max_{c_t} u(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(m_{t+1}, s_{t+1}) ], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# m_{t+1} &= \frac{R(s_{t+1})}{\Gamma(s_{t+1})\psi_{t+1}} a_t + \theta_{t+1}, \\
+# \theta_{t} \sim F_{\theta t}(s_t), &\qquad \psi_{t} \sim F_{\psi t}(s_t), \mathbb{E} [F_{\psi t}(s_t)] = 1, \\
+# Prob[s_{t+1}=j| s_t=i] &= \triangle_{ij}, \\
+# u(c) &= \frac{c^{1-\rho}}{1-\rho}
+# \end{align*}
 #
 # The Markov matrix $\triangle$ is giving transition probabilities from current state $i$ to future state $j$.
 
@@ -61,7 +61,7 @@ do_simulation = True
 #
 # The attribute $\texttt{MrkvArray}$ is a $\texttt{numpy.array}$ of size ($N_s$, $N_s$) corresponding to the number of discrete states.
 #
-# Note that $\texttt{MrkvArray}$ is am element of $\texttt{time_inv}$, so that the same transition probabilities are used for each period. However, it can be moved to $\texttt{time_vary}$ and specified as a list of $\texttt{array}$s instead.
+# Note that $\texttt{MrkvArray}$ is am element of $\texttt{time\\_inv}$, so that the same transition probabilities are used for each period. However, it can be moved to $\texttt{time\\_vary}$ and specified as a list of $\texttt{array}$s instead.
 #
 # The attributes $\texttt{Rfree}$, $\texttt{PermGroFac}$ and $\texttt{IncomeDstn}$ should be specified as arrays or lists with $N_s$ elements for each period.
 

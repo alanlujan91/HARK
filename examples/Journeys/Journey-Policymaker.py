@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -56,15 +56,15 @@
 # ## 1.2 Example: `IndShockConsumerType`
 # The `IndShockConsumerType` is our standard consumer that receives two income shocks at the beginning of each period: a completely transitory shock $\newcommand{\tShkEmp}{\theta}{\tShkEmp_t}$ and a completely permanent shock $\newcommand{\pShk}{\psi}{\pShk_t}$.  Moreover, the agent is subject to borrowing a borrowing limit: the ratio of end-of-period assets $A_t$ to permanent income $P_t$ must be greater than $\underline{a}$. As with most problems in HARK, this model is stated in terms of *normalized* variables, dividing all real variables by $P_t$:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} {~} u(c_t) + \beta (1-D_{t+1})  \mathbb{E}_{t} \left[ (\Gamma{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1}) \right], \\
-# a_t &=& m_t - c_t, \\
-# a_t &\geq& \text{$\underline{a}$}, \\
-# m_{t+1} &=& R/(\Gamma_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
-# (\psi_{t+1},\theta_{t+1}) &\sim& F_{t+1}, \\
-# \mathbb{E}[\psi]=\mathbb{E}[\theta] &=& 1, \\
-# u(c) &=& \frac{c^{1-\rho}}{1-\rho}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} {~} u(c_t) + \beta (1-D_{t+1})  \mathbb{E}_{t} \left[ (\Gamma{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1}) \right], \\
+# a_t &= m_t - c_t, \\
+# a_t &\geq \text{$\underline{a}$}, \\
+# m_{t+1} &= R/(\Gamma_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
+# (\psi_{t+1},\theta_{t+1}) &\sim F_{t+1}, \\
+# \mathbb{E}[\psi]=\mathbb{E}[\theta] &= 1, \\
+# u(c) &= \frac{c^{1-\rho}}{1-\rho}.
+# \end{align*}
 #
 # The object-oriented programming language makes it extremely easy to [use](https://github.com/econ-ark/HARK/blob/master/examples/ConsIndShockModel/IndShockConsumerType.ipynb). A small illustration is below solving an infinite horizon and lifecycle problem.
 #

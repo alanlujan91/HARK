@@ -9,7 +9,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -98,16 +98,16 @@ from HARK.ConsumptionSaving.ConsIndShockModel import IndShockConsumerType
 # The agent's problem can be written in Bellman form as:
 
 # %% [markdown]
-# \begin{eqnarray*}
-# v_t(M_t,p_t) &=& \max_{c_t} U(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E}_{t} [v_{t+1}(M_{t+1}, p_{t+1})] \\
-# a_t &=& M_t - c_t \\
-# a_t &\geq& \underline{a} \\
-# M_{t+1} &=& R a_t + \theta_{t+1} \\
-# p_{t+1} &=& G_{t+1}(p_t)\psi_{t+1} \\
-# \psi_t \sim F_{\psi_t} &\qquad&  \theta_t \sim F_{\theta_t} \\
-#  \mathbb{E} [F_{\psi_t}] = 1 & & \mathbb{E} [F_{\theta_t}] =1 \\
-# U(c) &=& \frac{c^{1-\rho}}{1-\rho}
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(M_t,p_t) &= \max_{c_t} U(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E}_{t} [v_{t+1}(M_{t+1}, p_{t+1})] \\
+# a_t &= M_t - c_t \\
+# a_t &\geq \underline{a} \\
+# M_{t+1} &= R a_t + \theta_{t+1} \\
+# p_{t+1} &= G_{t+1}(p_t)\psi_{t+1} \\
+# \psi_t \sim F_{\psi_t} &\qquad  \theta_t \sim F_{\theta_t} \\
+#  \mathbb{E} [F_{\psi_t}] = 1 &  \mathbb{E} [F_{\theta_t}] =1 \\
+# U(c) &= \frac{c^{1-\rho}}{1-\rho}
+# \end{align*}
 
 # %% [markdown]
 # The one-period problem for this model is solved by the function `solveConsGenIncProcess`, which creates an instance of the class `ConsGenIncProcessSolver`. The class `GenIncProcessConsumerType` extends `IndShockConsumerType` to represent agents in this model. To construct an instance of this class, several  parameters must be passed to the constructor, as shown in the table below (parameters can be either "primitive" or "constructed" if they have already built-in capabilities from previous models).
@@ -152,15 +152,15 @@ from HARK.ConsumptionSaving.ConsIndShockModel import IndShockConsumerType
 #
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# v_t(M_t,p_t) &=& \max_{c_t} U(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(M_{t+1}, p_{t+1}) ], \\
-# a_t &=& M_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# M_{t+1} &=& R/(\Gamma_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
-# p_{t+1} &=& G_{t+1}(p_t)\psi_{t+1}, \\
-# \psi_t \sim F_{\psi_t}, \mathbb{E} [F_{\psi_t}] = 1 &\qquad&  \theta_t \sim F_{\theta_t}, \mathbb{E} [F_{\theta_t}] = 1, \\
-# U(c) &=& \frac{c^{1-\rho}}{1-\rho}.
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(M_t,p_t) &= \max_{c_t} U(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(M_{t+1}, p_{t+1}) ], \\
+# a_t &= M_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# M_{t+1} &= R/(\Gamma_{t+1} \psi_{t+1}) a_t + \theta_{t+1}, \\
+# p_{t+1} &= G_{t+1}(p_t)\psi_{t+1}, \\
+# \psi_t \sim F_{\psi_t}, \mathbb{E} [F_{\psi_t}] = 1 &\qquad  \theta_t \sim F_{\theta_t}, \mathbb{E} [F_{\theta_t}] = 1, \\
+# U(c) &= \frac{c^{1-\rho}}{1-\rho}.
+# \end{align*}
 #
 #
 # * Note: This agent type is identical to an `IndShockConsumerType` consumer, but now the level of permanent income $\texttt{pLvl}$ is explicitly tracked as a state variable. This is the sense in which this model is a particular class of the GenIncProcess model, as shown in the mathematical description of the agent's optimization problem in that model.
@@ -339,15 +339,15 @@ plt.show()
 #
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# v_t(M_t,p_t) &=& \max_{c_t} U(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(M_{t+1}, p_{t+1}) ], \\
-# a_t &=& M_t - c_t, \\
-# a_t &\geq& \underline{a}, \\
-# M_{t+1} &=& R a_t + \theta_{t+1}, \\
-# log(p_{t+1}) &=& \varphi log(p_t)+(1-\varphi log(\overline{p}_{t+1} )) +log(\Gamma_{t+1})+log(\psi_{t+1}), \\
+# \begin{align*}
+# v_t(M_t,p_t) &= \max_{c_t} U(c_t) + \beta (1-\mathsf{D}_{t+1}) \mathbb{E} [v_{t+1}(M_{t+1}, p_{t+1}) ], \\
+# a_t &= M_t - c_t, \\
+# a_t &\geq \underline{a}, \\
+# M_{t+1} &= R a_t + \theta_{t+1}, \\
+# log(p_{t+1}) &= \varphi log(p_t)+(1-\varphi log(\overline{p}_{t+1} )) +log(\Gamma_{t+1})+log(\psi_{t+1}), \\
 # \\
-# \psi_t \sim F_{\psi_t}, \mathbb{E} [F_{\psi_t}] = 1 &\qquad&  \theta_t \sim F_{\theta_t}, \mathbb{E} [F_{\theta_t}] = 1 \\
-# \end{eqnarray*}
+# \psi_t \sim F_{\psi_t}, \mathbb{E} [F_{\psi_t}] = 1 &\qquad  \theta_t \sim F_{\theta_t}, \mathbb{E} [F_{\theta_t}] = 1 \\
+# \end{align*}
 #
 # ### Additional parameters to solve PersistentShock model
 #

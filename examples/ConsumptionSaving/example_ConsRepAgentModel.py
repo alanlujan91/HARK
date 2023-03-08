@@ -7,7 +7,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.14.5
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -40,17 +40,17 @@ from HARK.ConsumptionSaving.ConsRepAgentModel import (
 # %% [markdown]
 # The agent's problem can be written in Bellman form as:
 #
-# \begin{eqnarray*}
-# v_t(m_t) &=& \max_{c_t} U(c_t) + \beta \mathbb{E} [(\Gamma_{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1})], \\
-# a_t &=& m_t - c_t, \\
-# \psi_{t+1} &\sim& F_{\psi t+1}, \qquad  \mathbb{E} [F_{\psi t}] = 1,\\
-# \theta_{t+1} &\sim& F_{\theta t+1}, \\
-# k_{t+1} &=& a_t/(\Gamma_{t+1}\psi_{t+1}), \\
-# R_{t+1} &=& 1 - \delta + \alpha (k_{t+1}/\theta_{t+1})^{(\alpha - 1)}, \\
-# w_{t+1} &=& (1-\alpha) (k_{t+1}/\theta_{t+1})^\alpha, \\
-# m_{t+1} &=& R_{t+1} k_{t+1} + w_{t+1}\theta_{t+1}, \\
-# U(c) &=& \frac{c^{1-\rho}}{1-\rho}
-# \end{eqnarray*}
+# \begin{align*}
+# v_t(m_t) &= \max_{c_t} U(c_t) + \beta \mathbb{E} [(\Gamma_{t+1}\psi_{t+1})^{1-\rho} v_{t+1}(m_{t+1})], \\
+# a_t &= m_t - c_t, \\
+# \psi_{t+1} &\sim F_{\psi t+1}, \qquad  \mathbb{E} [F_{\psi t}] = 1,\\
+# \theta_{t+1} &\sim F_{\theta t+1}, \\
+# k_{t+1} &= a_t/(\Gamma_{t+1}\psi_{t+1}), \\
+# R_{t+1} &= 1 - \delta + \alpha (k_{t+1}/\theta_{t+1})^{(\alpha - 1)}, \\
+# w_{t+1} &= (1-\alpha) (k_{t+1}/\theta_{t+1})^\alpha, \\
+# m_{t+1} &= R_{t+1} k_{t+1} + w_{t+1}\theta_{t+1}, \\
+# U(c) &= \frac{c^{1-\rho}}{1-\rho}
+# \end{align*}
 
 # %% [markdown]
 # The one period problem for this model is solved by the function $\texttt{solveConsRepAgent}$.
