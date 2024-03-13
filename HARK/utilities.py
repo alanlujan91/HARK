@@ -3,6 +3,7 @@ General purpose  / miscellaneous functions.  Includes functions to approximate
 continuous distributions with discrete ones, utility functions (and their
 derivatives), manipulation of discrete distributions, and basic plotting tools.
 """
+
 import cProfile
 import functools
 import os
@@ -574,9 +575,7 @@ def jump_to_grid_2D(m_vals, perm_vals, probs, dist_mGrid, dist_pGrid):
     # For instance, if mval lies between dist_mGrid[4] and dist_mGrid[5] it is in bin 4 (would be 5 if 1 was not subtracted in the previous line).
     mIndex[
         m_vals <= dist_mGrid[0]
-    ] = (
-        -1
-    )  # if the value is less than the smallest value on dist_mGrid assign it an index of -1
+    ] = -1  # if the value is less than the smallest value on dist_mGrid assign it an index of -1
     mIndex[m_vals >= dist_mGrid[-1]] = (
         len(dist_mGrid) - 1
     )  # if value if greater than largest value on dist_mGrid assign it an index of the length of the grid minus 1
@@ -606,8 +605,9 @@ def jump_to_grid_2D(m_vals, perm_vals, probs, dist_mGrid, dist_pGrid):
             mlowerIndex = mIndex[i]
             mupperIndex = mIndex[i] + 1
             # Assign weight to the indices that bound the m_vals point. Intuitively, an mval perfectly between two points on the mgrid will assign a weight of .5 to the gridpoint above and below
-            mlowerWeight = (dist_mGrid[mupperIndex] - m_vals[i]) / (
-                dist_mGrid[mupperIndex] - dist_mGrid[mlowerIndex]
+            mlowerWeight = (
+                (dist_mGrid[mupperIndex] - m_vals[i])
+                / (dist_mGrid[mupperIndex] - dist_mGrid[mlowerIndex])
             )  # Metric to determine weight of gridpoint/index below. Intuitively, mvals that are close to gridpoint/index above are assigned a smaller mlowerweight.
             mupperWeight = 1.0 - mlowerWeight  # weight of gridpoint/ index above
 
@@ -1006,7 +1006,7 @@ def make_figs(figure_name, saveFigs, drawFigs, target_dir="Figures"):
         print(f"Saving figure {figure_name} in {target_dir}")
         plt.savefig(
             os.path.join(target_dir, f"{figure_name}.jpg"),
-            metadata={"CreationDate": None},
+            # metadata is not supported for jpg
         )  # For web/html
         plt.savefig(
             os.path.join(target_dir, f"{figure_name}.png"),

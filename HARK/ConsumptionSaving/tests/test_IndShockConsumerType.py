@@ -115,6 +115,12 @@ class testIndShockConsumerType(unittest.TestCase):
         # simulation test -- seed/generator specific
         # self.assertAlmostEqual(self.agent.state_now["aLvl"][1], 0.18438, place = HARK_PRECISION)
 
+    def test_income_dist_random_seeds(self):
+        a1 = IndShockConsumerType(seed=1000)
+        a2 = IndShockConsumerType(seed=200)
+
+        self.assertFalse(a1.PermShkDstn.seed == a2.PermShkDstn.seed)
+
 
 class testBufferStock(unittest.TestCase):
     """Tests of the results of the BufferStock REMARK."""
@@ -163,9 +169,9 @@ class testBufferStock(unittest.TestCase):
         GICRaw_fail_dictionary = dict(self.base_params)
         GICRaw_fail_dictionary["Rfree"] = 1.08
         GICRaw_fail_dictionary["PermGroFac"] = [1.00]
-        GICRaw_fail_dictionary[
-            "cycles"
-        ] = 0  # cycles=0 makes this an infinite horizon consumer
+        GICRaw_fail_dictionary["cycles"] = (
+            0  # cycles=0 makes this an infinite horizon consumer
+        )
 
         GICRawFailExample = IndShockConsumerType(**GICRaw_fail_dictionary)
 
@@ -414,7 +420,7 @@ class testIndShockConsumerTypeCyclical(unittest.TestCase):
         CyclicalExample.simulate()
 
         self.assertAlmostEqual(
-            CyclicalExample.state_now["aLvl"][1], 2.41243, places=HARK_PRECISION
+            CyclicalExample.state_now["aLvl"][1], 3.32431, places=HARK_PRECISION
         )
 
 
@@ -890,9 +896,7 @@ class test_Transition_Matrix_Methods(unittest.TestCase):
         asset = example1.aPol_Grid  # Normalized Asset Policy Grid
 
         example1.calc_ergodic_dist()
-        vecDstn = (
-            example1.vec_erg_dstn
-        )  # Distribution of market resources and permanent income as a vector (m*p)x1 vector where
+        vecDstn = example1.vec_erg_dstn  # Distribution of market resources and permanent income as a vector (m*p)x1 vector where
 
         # Compute Aggregate Consumption and Aggregate Assets
         gridc = np.zeros((len(c), len(p)))
