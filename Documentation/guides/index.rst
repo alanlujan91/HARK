@@ -7,6 +7,7 @@ Guides
 
    quick_start
    installation
+   timing_and_periods
 
 .. toctree::
    :caption: Development

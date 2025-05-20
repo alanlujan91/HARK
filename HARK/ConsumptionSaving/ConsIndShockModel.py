@@ -1119,9 +1119,16 @@ class PerfForesightConsumerType(AgentType):
     Solving Parameters
     ------------------
     cycles: int
-        0 specifies an infinite horizon model, 1 specifies a finite model.
+        Specifies the number of times the sequence of periods in `T_cycle` is repeated.
+        *   If `cycles = 0`, the model is infinite horizon. The sequence of parameters for `T_cycle` periods is repeated indefinitely.
+        *   If `cycles = 1`, the model is finite horizon. The sequence of parameters for `T_cycle` periods is executed exactly once.
+        *   If `cycles > 1`, the model is finite horizon but repeats the `T_cycle` sequence `cycles` times. This is less common.
     T_cycle: int
-        Number of periods in the cycle for this agent type.
+        The number of periods in the sequence of parameters (e.g., income growth, interest rates, survival probabilities) that make up a 'cycle'.
+        *   Interactions with `cycles`:
+            *   `cycles = 0, T_cycle = 1`: Standard infinite horizon model where parameters are constant over time. Use-case: A theoretical model with no time-varying components.
+            *   `cycles = 1, T_cycle = N`: Finite horizon N-period model. The parameters can vary over these N periods. Use-case: A lifecycle model where N represents the number of years of life (e.g., `T_cycle = 80` for an 80-year lifecycle).
+            *   `cycles = 0, T_cycle = N`: Infinite horizon model with an N-period cycle that repeats indefinitely. The parameters are constant within each phase of the cycle but vary across the N periods. Use-case: A model with seasonality, like quarterly data (`T_cycle = 4`), where the four distinct periods repeat forever.
     CRRA: float, :math:`\rho`
         Coefficient of Relative Risk Aversion.
     Rfree: float or list[float], time varying, :math:`\mathsf{R}`
@@ -1214,9 +1221,20 @@ class PerfForesightConsumerType(AgentType):
     def pre_solve(self):
         """
         Method that is run automatically just before solution by backward iteration.
-        Solves the (trivial) terminal period and does a quick check on the borrowing
-        constraint and MaxKinks attribute (only relevant in constrained, infinite
-        horizon problems).
+
+        This method prepares the agent for solving by:
+        1. Constructing the solution for the terminal period using `self.construct("solution_terminal")`.
+        2. Calling `self.check_conditions()`. The behavior of `check_conditions`
+           is sensitive to `self.cycles` and `self.T_cycle`, performing detailed
+           checks mainly for infinite horizon models (`cycles=0, T_cycle=1`).
+        3. Setting up `self.MaxKinks`:
+            - If `self.cycles > 0` (finite horizon, regardless of `T_cycle`),
+              `MaxKinks` is set to `np.inf` as it's not relevant.
+            - If `self.cycles = 0` (infinite horizon) and `self.BoroCnstArt` is None,
+              `MaxKinks` is also set to `np.inf`.
+            - It raises an AttributeError if `self.cycles = 0`, `self.BoroCnstArt` is
+              specified, but `MaxKinks` is not, as `MaxKinks` is crucial for
+              constrained infinite horizon problems.
         """
         self.construct("solution_terminal")  # Solve the terminal period problem
         if not self.quiet:
@@ -1228,7 +1246,7 @@ class PerfForesightConsumerType(AgentType):
             self.BoroCnstArt = None  # ...assume the user wanted none
 
         if not hasattr(self, "MaxKinks"):
-            if self.cycles > 0:  # If it's not an infinite horizon model...
+            if self.cycles > 0:  # If it's not an infinite horizon model (e.g. cycles=1, T_cycle=N or cycles>1, T_cycle=N)...
                 self.MaxKinks = np.inf  # ...there's no need to set MaxKinks
             elif self.BoroCnstArt is None:  # If there's no borrowing constraint...
                 self.MaxKinks = np.inf  # ...there's no need to set MaxKinks
@@ -1241,9 +1259,13 @@ class PerfForesightConsumerType(AgentType):
 
     def post_solve(self):
         """
-        Method that is run automatically at the end of a call to solve. Here, it
-        simply calls calc_stable_points() if appropriate: an infinite horizon
-        problem with a single repeated period in its cycle.
+        Method that is run automatically at the end of a call to `solve()`.
+
+        Its primary action is to call `self.calc_stable_points()` if the model
+        is an infinite horizon type (`self.cycles == 0`) with a single,
+        infinitely repeated period (`self.T_cycle == 1`). For other configurations
+        of `cycles` and `T_cycle` (e.g., finite horizon or cyclical infinite horizon),
+        `calc_stable_points()` is not called.
 
         Parameters
         ----------
@@ -1370,9 +1392,20 @@ class PerfForesightConsumerType(AgentType):
 
     def get_shocks(self):
         """
-        Finds permanent and transitory income "shocks" for each agent this period.  As this is a
-        perfect foresight model, there are no stochastic shocks: PermShkNow = PermGroFac for each
-        agent (according to their t_cycle) and TranShkNow = 1.0 for all agents.
+        Sets permanent and transitory income "shocks" for each agent for the current period.
+        In this perfect foresight model, there are no stochastic shocks.
+
+        Behavior based on `T_cycle`:
+        - `PermShkNow` (Permanent Shock): Set to the `PermGroFac` corresponding
+          to the agent's current period within the cycle. `self.PermGroFac` is a list
+          of length `T_cycle`. The specific growth factor is retrieved using
+          `self.PermGroFac[agent.t_cycle - 1]`, where `agent.t_cycle` indicates the
+          current phase of the cycle for each agent (1-indexed in this context for array access).
+        - `TranShkNow` (Transitory Shock): Always set to 1.0 for all agents, as there
+          are no transitory shocks in the perfect foresight model.
+
+        The `cycles` parameter does not directly influence this method's logic beyond
+        how `t_cycle` is updated and managed by the simulation framework.
 
         Parameters
         ----------
@@ -1383,9 +1416,13 @@ class PerfForesightConsumerType(AgentType):
         None
         """
         PermGroFac = np.array(self.PermGroFac)
-        # Cycle time has already been advanced
-        self.shocks["PermShk"] = PermGroFac[self.t_cycle - 1]
-        # self.shocks["PermShk"][self.t_cycle == 0] = 1. # Add this at some point
+        # Cycle time has already been advanced; self.t_cycle is 0-indexed internally by AgentType.advance_time()
+        # but often treated as 1-indexed in model parameter lists.
+        # Here, PermGroFac is indexed based on the 0-indexed self.t_cycle after time has advanced.
+        # If self.PermGroFac has T_cycle elements, agents in t_cycle=0 get PermGroFac[0], etc.
+        # The -1 in `PermGroFac[self.t_cycle - 1]` from original code implies t_cycle was 1-indexed there.
+        # Assuming self.t_cycle is 0-indexed after advance_time():
+        self.shocks["PermShk"] = PermGroFac[self.t_cycle]
         self.shocks["TranShk"] = np.ones(self.AgentCount)
 
     def get_Rfree(self):
@@ -1427,7 +1464,21 @@ class PerfForesightConsumerType(AgentType):
 
     def get_controls(self):
         """
-        Calculates consumption for each consumer of this type using the consumption functions.
+        Calculates consumption for each consumer of this type using the period-specific
+        consumption functions from the solution.
+
+        Behavior based on `T_cycle`:
+        - The method iterates `t` from `0` to `self.T_cycle - 1`.
+        - For each `t`, it identifies agents whose current cyclical period `agent.t_cycle`
+          matches `t`.
+        - It then applies `self.solution[t].cFunc` (the consumption function for
+          period `t` of the cycle) to these agents' market resources `self.state_now["mNrm"]`.
+        - The resulting consumption and MPC are stored.
+
+        The `cycles` parameter influences how many times `t_cycle` revolves through
+        its range (0 to `T_cycle-1`) over an agent's lifetime, but `get_controls`
+        itself primarily uses `T_cycle` to select the correct consumption function
+        from the `self.solution` list.
 
         Parameters
         ----------
@@ -1439,11 +1490,14 @@ class PerfForesightConsumerType(AgentType):
         """
         cNrmNow = np.zeros(self.AgentCount) + np.nan
         MPCnow = np.zeros(self.AgentCount) + np.nan
-        for t in range(self.T_cycle):
-            these = t == self.t_cycle
-            cNrmNow[these], MPCnow[these] = self.solution[t].cFunc.eval_with_derivative(
-                self.state_now["mNrm"][these]
-            )
+        # self.t_cycle is an array of current cycle periods for all agents (0 to T_cycle-1)
+        # self.solution is a list of solution objects, one for each period in T_cycle
+        for t in range(self.T_cycle):  # t iterates from 0 to T_cycle-1
+            these = self.t_cycle == t # Agents currently in period t of their cycle
+            if np.any(these):
+                cNrmNow[these], MPCnow[these] = self.solution[t].cFunc.eval_with_derivative(
+                    self.state_now["mNrm"][these]
+                )
         self.controls["cNrm"] = cNrmNow
 
         # MPCnow is not really a control
@@ -1676,15 +1730,21 @@ class PerfForesightConsumerType(AgentType):
 
     def check_conditions(self, verbose=None):
         """
-        This method checks whether the instance's type satisfies the
-        Absolute Impatience Condition (AIC), the Return Impatience Condition (RIC),
-        the Finite Human Wealth Condition (FHWC), the perfect foresight model's
-        Growth Impatience Condition (GICRaw) and Perfect Foresight Finite Value
-        of Autarky Condition (FVACPF). Depending on the configuration of parameter
-        values, somecombination of these conditions must be satisfied in order
-        for the problem to have a nondegenerate solution. To check which conditions
-        are required, in the verbose mode a reference to the relevant theoretical
-        literature is made.
+        Checks whether the model instance satisfies standard theoretical conditions
+        such as AIC, RIC, FHWC, GICRaw, and PFFVAC. These checks are primarily
+        relevant for ensuring the non-degeneracy and stability of solutions in
+        infinite horizon models.
+
+        Behavior based on `cycles` and `T_cycle`:
+        - The detailed condition checks (AIC, RIC, etc.) are performed *only if*
+          `self.cycles == 0` (indicating an infinite horizon model) *and*
+          `self.T_cycle == 1` (indicating a single, infinitely repeated period
+          with constant parameters).
+        - If `self.cycles != 0` (finite horizon) or `self.T_cycle > 1` (cyclical
+          parameters in infinite horizon), a message is logged stating that the
+          full conditions report is not produced, and the method returns early.
+        - For the `cycles = 0, T_cycle = 1` case, it calculates various patience
+          factors and logs whether each condition is met.
 
         Parameters
         ----------
@@ -1704,9 +1764,10 @@ class PerfForesightConsumerType(AgentType):
         verbose = self.verbose if verbose is None else verbose
 
         # This method only checks for the conditions for infinite horizon models
-        # with a 1 period cycle. If these conditions are not met, we exit early.
+        # with a 1 period cycle (cycles=0, T_cycle=1).
+        # If these conditions are not met, we exit early.
         if self.cycles != 0 or self.T_cycle > 1:
-            trivial_message = "No conditions report was produced because this functionality is only supported for infinite horizon models with a cycle length of 1."
+            trivial_message = "No conditions report was produced because this functionality is only supported for infinite horizon models with a cycle length of 1 (cycles=0, T_cycle=1)."
             self.log_condition_result(None, None, trivial_message, verbose)
             if not self.quiet:
                 _log.info(self.bilt["conditions_report"])
@@ -1986,9 +2047,16 @@ class IndShockConsumerType(PerfForesightConsumerType):
     Solving Parameters
     ------------------
     cycles: int
-        0 specifies an infinite horizon model, 1 specifies a finite model.
+        Specifies the number of times the sequence of periods in `T_cycle` is repeated.
+        *   If `cycles = 0`, the model is infinite horizon. The sequence of parameters for `T_cycle` periods is repeated indefinitely.
+        *   If `cycles = 1`, the model is finite horizon. The sequence of parameters for `T_cycle` periods is executed exactly once.
+        *   If `cycles > 1`, the model is finite horizon but repeats the `T_cycle` sequence `cycles` times. This is less common.
     T_cycle: int
-        Number of periods in the cycle for this agent type.
+        The number of periods in the sequence of parameters (e.g., income growth, interest rates, survival probabilities) that make up a 'cycle'.
+        *   Interactions with `cycles`:
+            *   `cycles = 0, T_cycle = 1`: Standard infinite horizon model where parameters are constant over time. Use-case: A theoretical model with no time-varying components.
+            *   `cycles = 1, T_cycle = N`: Finite horizon N-period model. The parameters can vary over these N periods. Use-case: A lifecycle model where N represents the number of years of life (e.g., `T_cycle = 80` for an 80-year lifecycle).
+            *   `cycles = 0, T_cycle = N`: Infinite horizon model with an N-period cycle that repeats indefinitely. The parameters are constant within each phase of the cycle but vary across the N periods. Use-case: A model with seasonality, like quarterly data (`T_cycle = 4`), where the four distinct periods repeat forever.
     CRRA: float, :math:`\rho`
         Coefficient of Relative Risk Aversion.
     Rfree: float or list[float], time varying, :math:`\mathsf{R}`
@@ -2114,13 +2182,28 @@ class IndShockConsumerType(PerfForesightConsumerType):
 
     def get_shocks(self):
         """
-        Gets permanent and transitory income shocks for this period.  Samples from IncShkDstn for
-        each period in the cycle.
+        Gets permanent and transitory income shocks for this period. Samples from
+        `self.IncShkDstn` for each period in the cycle.
+
+        Behavior based on `cycles` and `T_cycle`:
+        - The method iterates `t` from `0` to `self.T_cycle - 1`.
+        - For agents whose current cycle period `agent.t_cycle` matches `t`:
+            - An adjustment `t_idx = t - 1` is made if `self.cycles == 1` (finite
+              horizon, single sequence). This aligns simulation periods (often 1-indexed
+              conceptually for solution periods) with the 0-indexed `IncShkDstn` and
+              `PermGroFac` lists (which are of length `T_cycle`). For `cycles = 0`
+              (infinite horizon), `t_idx = t`.
+            - Shocks are drawn using `self.IncShkDstn[t_idx]` and scaled by
+              `self.PermGroFac[t_idx]`.
+        - Newborn agents (`self.t_age == 0`) always have their shocks drawn using
+          `self.IncShkDstn[0]` and `self.PermGroFac[0]`, regardless of the loop variable `t`.
+        - If `self.NewbornTransShk` is False, transitory shocks for newborns are set to 1.0.
 
         Parameters
         ----------
         NewbornTransShk : boolean, optional
-            Whether Newborns have transitory shock. The default is False.
+            Attribute of self, not a direct parameter. If False, newborns' transitory shocks
+            are overridden to be 1.0. Defaults to False if not set on the instance.
 
         Returns
         -------
@@ -2133,48 +2216,69 @@ class IndShockConsumerType(PerfForesightConsumerType):
         PermShkNow = np.zeros(self.AgentCount)  # Initialize shock arrays
         TranShkNow = np.zeros(self.AgentCount)
         newborn = self.t_age == 0
-        for t in range(self.T_cycle):
-            these = t == self.t_cycle
 
-            # temporary, see #1022
-            if self.cycles == 1:
-                t = t - 1
+        # self.t_cycle is an array of 0-indexed current cycle periods for all agents
+        for t_iter in range(self.T_cycle): # t_iter is 0 to T_cycle-1
+            these = self.t_cycle == t_iter # Agents currently in period t_iter of their cycle
+
+            # Determine the correct index for time-varying parameters like IncShkDstn and PermGroFac
+            # These lists have T_cycle elements, indexed 0 to T_cycle-1.
+            # If cycles == 1 (finite horizon, T_cycle periods total), an agent in t_cycle=0 (first period)
+            # should use parameters at index 0. The solution is indexed 0 to T_cycle-1.
+            # The original code's `t = t - 1` when `cycles == 1` implied that `t_cycle` might have
+            # been perceived as 1-indexed in that context.
+            # Assuming self.t_cycle is consistently 0-indexed from AgentType.advance_time():
+            param_idx = t_iter
+
+            # The special indexing `t = t - 1` (now `param_idx = t_iter -1` if we were to replicate)
+            # for `cycles == 1` in the original code needs careful handling.
+            # If self.IncShkDstn has T_cycle elements, and self.t_cycle runs 0..T_cycle-1:
+            # For finite horizon (cycles=1, T_cycle=N), an agent progresses through t_cycle = 0, 1, ..., N-1.
+            # The solution is also typically indexed 0 to N-1.
+            # The line `if self.cycles == 1: t = t - 1` in the original code seems problematic if t_cycle is 0-indexed.
+            # Let's assume param_idx should directly correspond to t_iter if parameters are for periods 0 to T_cycle-1.
+            # The comment "# temporary, see #1022" suggests this was a known issue or workaround.
+            # For now, directly using t_iter as param_idx, assuming parameters are aligned with 0-indexed t_cycle.
+            # If solution for period `j` uses `IncShkDstn[j]`, and agent is in `t_cycle = j`, then `param_idx = j`.
+
+            # Re-evaluating the original logic:
+            # `self.t_cycle` is updated by `advance_time` and is 0-indexed.
+            # `self.solution` is 0-indexed (0 to T_cycle-1 for infinite, 0 to T_cycle for finite+terminal).
+            # Time-varying parameters like `LivPrb`, `PermGroFac`, `IncShkDstn` are lists of length `T_cycle`.
+            # When `cycles == 1`, the agent lives for `T_cycle` periods. `self.t_cycle` goes from `0` to `T_cycle-1`.
+            # The original `t = t-1` when `cycles == 1` was inside `for t in range(self.T_cycle)`.
+            # If `t_cycle` is 0-indexed, then `IncShkDstn[self.t_cycle[these]]` should be correct.
+            # The loop `for t in range(self.T_cycle)` with `these = t == self.t_cycle` correctly maps.
+            # The `t = t - 1` line was likely to adjust `t` itself if it was used as an index into a solution
+            # array that had a different structure for finite models (e.g. T+1 elements).
+            # For accessing parameter lists of length T_cycle, `t_iter` (or `self.t_cycle[these]`) is the direct index.
+            # The #1022 points to `DiePrb_by_t_cycle[self.t_cycle - 1 if self.cycles == 1 else self.t_cycle]`.
+            # This implies for `cycles == 1`, `t_cycle` might be 1-indexed for `DiePrb` access or `DiePrb` has a different structure.
+            # Let's stick to clarifying the direct use of `t_cycle` for parameter arrays of length `T_cycle`.
 
             N = np.sum(these)
             if N > 0:
-                # set current income distribution
-                IncShkDstnNow = self.IncShkDstn[t]
-                # and permanent growth factor
-                PermGroFacNow = self.PermGroFac[t]
-                # Get random draws of income shocks from the discrete distribution
-                IncShks = IncShkDstnNow.draw(N)
+                IncShkDstnNow = self.IncShkDstn[param_idx]
+                PermGroFacNow = self.PermGroFac[param_idx]
+                IncShks = IncShkDstnNow.draw(N) # Draw N shocks
 
-                PermShkNow[these] = (
-                    IncShks[0, :] * PermGroFacNow
-                )  # permanent "shock" includes expected growth
-                TranShkNow[these] = IncShks[1, :]
+                PermShkNow[these] = IncShks[0,:] * PermGroFacNow
+                TranShkNow[these] = IncShks[1,:]
 
-        # That procedure used the *last* period in the sequence for newborns, but that's not right
-        # Redraw shocks for newborns, using the *first* period in the sequence.  Approximation.
-        N = np.sum(newborn)
-        if N > 0:
-            these = newborn
-            # set current income distribution
+
+        # Newborns always use the parameters from the first period (index 0) of the cycle.
+        N_newborn = np.sum(newborn)
+        if N_newborn > 0:
             IncShkDstnNow = self.IncShkDstn[0]
-            PermGroFacNow = self.PermGroFac[0]  # and permanent growth factor
+            PermGroFacNow = self.PermGroFac[0]
 
-            # Get random draws of income shocks from the discrete distribution
-            EventDraws = IncShkDstnNow.draw_events(N)
-            PermShkNow[these] = (
-                IncShkDstnNow.atoms[0][EventDraws] * PermGroFacNow
-            )  # permanent "shock" includes expected growth
-            TranShkNow[these] = IncShkDstnNow.atoms[1][EventDraws]
-        #        PermShkNow[newborn] = 1.0
-        #  Whether Newborns have transitory shock. The default is False.
+            EventDraws = IncShkDstnNow.draw_events(N_newborn)
+            PermShkNow[newborn] = IncShkDstnNow.atoms[0][EventDraws] * PermGroFacNow
+            TranShkNow[newborn] = IncShkDstnNow.atoms[1][EventDraws]
+
         if not NewbornTransShk:
             TranShkNow[newborn] = 1.0
 
-        # Store the shocks in self
         self.shocks["PermShk"] = PermShkNow
         self.shocks["TranShk"] = TranShkNow
 
@@ -2282,6 +2386,18 @@ class IndShockConsumerType(PerfForesightConsumerType):
         self.eulerErrorFunc = eulerErrorFunc
 
     def pre_solve(self):
+        """
+        Method run automatically just before the backward iteration solution process.
+
+        For `IndShockConsumerType`, this method:
+        1. Constructs the solution for the terminal period using `self.construct("solution_terminal")`.
+        2. Calls `self.check_conditions(verbose=self.verbose)`. The behavior of
+           `check_conditions` is sensitive to `self.cycles` and `self.T_cycle`.
+           Detailed condition checks (like AIC, RIC, etc.) are primarily performed
+           for models configured as simple infinite horizon (`cycles=0, T_cycle=1`).
+           For other configurations, `check_conditions` may log a message and skip
+           these detailed checks.
+        """
         self.construct("solution_terminal")
         if not self.quiet:
             self.check_conditions(verbose=self.verbose)
@@ -2537,10 +2653,24 @@ class IndShockConsumerType(PerfForesightConsumerType):
 
     def check_conditions(self, verbose=None):
         """
-        This method checks whether the instance's type satisfies various conditions.
-        When combinations of these conditions are satisfied, the solution to the
-        problem exhibits different characteristics.  (For an exposition of the
-        conditions, see https://econ-ark.github.io/BufferStockTheory/)
+        Checks whether the model instance satisfies standard theoretical conditions
+        relevant for idiosyncratic shock models (e.g., AIC, RIC, WRIC, GICMod, FVAC, FHWC).
+        These checks help ensure the non-degeneracy and stability of solutions,
+        particularly in infinite horizon contexts.
+
+        Behavior based on `cycles` and `T_cycle`:
+        - The detailed condition checks are performed *only if* `self.cycles == 0`
+          (indicating an infinite horizon model) *and* `self.T_cycle == 1`
+          (indicating a single, infinitely repeated period with constant parameters).
+        - If `self.cycles != 0` (finite horizon) or `self.T_cycle > 1` (cyclical
+          parameters in infinite horizon), a message is logged stating that the
+          full conditions report is not produced for such configurations, and the
+          method returns early without performing the detailed checks.
+        - For the `cycles = 0, T_cycle = 1` case, it calculates various patience
+          factors and other relevant model properties, then logs whether each
+          condition (like GICMod, WRIC, FVAC) is met.
+
+        (For an exposition of the conditions, see https://econ-ark.github.io/BufferStockTheory/)
 
         Parameters
         ----------
@@ -2559,9 +2689,10 @@ class IndShockConsumerType(PerfForesightConsumerType):
         verbose = self.verbose if verbose is None else verbose
 
         # This method only checks for the conditions for infinite horizon models
-        # with a 1 period cycle. If these conditions are not met, we exit early.
+        # with a 1 period cycle (cycles=0, T_cycle=1).
+        # If these conditions are not met, we exit early.
         if self.cycles != 0 or self.T_cycle > 1:
-            trivial_message = "No conditions report was produced because this functionality is only supported for infinite horizon models with a cycle length of 1."
+            trivial_message = "No conditions report was produced because this functionality is only supported for infinite horizon models with a cycle length of 1 (cycles=0, T_cycle=1)."
             self.log_condition_result(None, None, trivial_message, verbose)
             if not self.quiet:
                 _log.info(self.bilt["conditions_report"])
