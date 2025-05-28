@@ -128,7 +128,12 @@ class ConsumerSolution(MetricObject):
     MPCmax : float
         Supremum of the marginal propensity to consume this period.
         MPC --> MPCmax as m --> mNrmMin.
-
+    mNrmStE : float, optional
+        Steady state (constant) market resources normalized by permanent income.
+        Populated by `calc_stable_points()`. Defaults to None.
+    mNrmTrg : float, optional
+        Target market resources normalized by permanent income.
+        Populated by `calc_stable_points()`. Defaults to None.
     """
 
     distance_criteria = ["vPfunc"]
@@ -143,6 +148,8 @@ class ConsumerSolution(MetricObject):
         hNrm=None,
         MPCmin=None,
         MPCmax=None,
+        mNrmStE=None, # Added new attribute
+        mNrmTrg=None, # Added new attribute
     ):
         # Change any missing function inputs to NullFunc
         self.cFunc = cFunc if cFunc is not None else NullFunc()
@@ -154,6 +161,8 @@ class ConsumerSolution(MetricObject):
         self.hNrm = hNrm
         self.MPCmin = MPCmin
         self.MPCmax = MPCmax
+        self.mNrmStE = mNrmStE # Initialize new attribute
+        self.mNrmTrg = mNrmTrg # Initialize new attribute
 
     def append_solution(self, new_solution):
         """
@@ -185,12 +194,17 @@ class ConsumerSolution(MetricObject):
             self.vPfunc = [new_solution.vPfunc]
             self.vPPfunc = [new_solution.vPPfunc]
             self.mNrmMin = [new_solution.mNrmMin]
+            # Ensure new attributes are also handled if solutions are appended (though less likely for these scalar values)
+            self.mNrmStE = [new_solution.mNrmStE] if not isinstance(self.mNrmStE, list) else self.mNrmStE + [new_solution.mNrmStE]
+            self.mNrmTrg = [new_solution.mNrmTrg] if not isinstance(self.mNrmTrg, list) else self.mNrmTrg + [new_solution.mNrmTrg]
         else:
             self.cFunc.append(new_solution.cFunc)
             self.vFunc.append(new_solution.vFunc)
             self.vPfunc.append(new_solution.vPfunc)
             self.vPPfunc.append(new_solution.vPPfunc)
             self.mNrmMin.append(new_solution.mNrmMin)
+            self.mNrmStE.append(new_solution.mNrmStE)
+            self.mNrmTrg.append(new_solution.mNrmTrg)
 
 
 # =====================================================================
@@ -1043,6 +1057,8 @@ def make_basic_CRRA_solution_terminal(CRRA):
         hNrm=0.0,
         MPCmin=1.0,
         MPCmax=1.0,
+        mNrmStE=None, # Ensure terminal solution can hold these
+        mNrmTrg=None, # Ensure terminal solution can hold these
     )
     return solution_terminal
 
@@ -1793,80 +1809,129 @@ class PerfForesightConsumerType(AgentType):
         if not self.quiet:
             _log.info(self.bilt["conditions_report"])
 
-    def calc_stable_points(self, force=False):
+    def calc_stable_points(self, solution_object, force=False):
         """
         If the problem is one that satisfies the conditions required for target ratios of different
-        variables to permanent income to exist, and has been solved to within the self-defined
-        tolerance, this method calculates the target values of market resources.
+        variables to permanent income to exist, this method calculates the target values of market resources
+        and stores them on the provided solution_object.
 
         Parameters
         ----------
+        solution_object : ConsumerSolution
+            The specific solution object (e.g., solution_now or solution_last from the solver loop)
+            on which to store the calculated mNrmStE and mNrmTrg.
         force : bool
             Indicator for whether the method should be forced to be run even if
-            the agent seems to be the wrong type. Default is False.
+            the agent type conditions (e.g. not PerfForesight or IndShock) are not met. Default is False.
 
         Returns
         -------
         None
         """
-        # Child classes should not run this method
-        is_perf_foresight = type(self) is PerfForesightConsumerType
-        is_ind_shock = type(self) is IndShockConsumerType
+        # Check agent type if force is False
+        is_perf_foresight = isinstance(self, PerfForesightConsumerType) # Use isinstance for inheritance
+        is_ind_shock = isinstance(self, IndShockConsumerType)
         if not (is_perf_foresight or is_ind_shock or force):
+            _log.warning(f"calc_stable_points called on an agent of type {type(self).__name__} which is not PerfForesightConsumerType or IndShockConsumerType and force=False. Skipping.")
             return
 
+        # Check model characteristics (infinite horizon, single period cycle)
         infinite_horizon = self.cycles == 0
-        single_period = self.T_cycle = 1
+        # single_period = self.T_cycle == 1 # T_cycle can be an int or list
+        # Ensure T_cycle is an integer for this check, or that all elements are 1 if it's a list (though typically int for this context)
+        is_single_period_cycle = False
+        if isinstance(self.T_cycle, int):
+            is_single_period_cycle = (self.T_cycle == 1)
+        elif isinstance(self.T_cycle, list) and len(self.T_cycle) > 0 : # Should not happen for solved agent
+             is_single_period_cycle = all(t == 1 for t in self.T_cycle)
+
+
         if not infinite_horizon:
             _log.warning(
-                "The calc_stable_points method works only for infinite horizon models."
+                "The calc_stable_points method is typically meaningful only for infinite horizon models."
             )
+            # We might still proceed if forced, but mNrmStE/Trg might be NaN or misleading.
+            # For now, let's return if not infinite horizon, as stable points are an inf-horizon concept.
+            solution_object.mNrmStE = np.nan
+            solution_object.mNrmTrg = np.nan
             return
-        if not single_period:
+        if not is_single_period_cycle:
             _log.warning(
-                "The calc_stable_points method works only with a single infinitely repeated period."
+                "The calc_stable_points method is typically meaningful only with a single infinitely repeated period (T_cycle=1)."
             )
+            solution_object.mNrmStE = np.nan
+            solution_object.mNrmTrg = np.nan
             return
-        if not hasattr(self, "conditions"):
+            
+        # Check for necessary pre-computed agent attributes (from calc_limiting_values)
+        if not hasattr(self, "conditions") or not hasattr(self, "bilt") or "BalGroFunc" not in self.bilt:
             _log.warning(
-                "The calc_limiting_values method must be run before the calc_stable_points method."
+                "The agent's `calc_limiting_values` method (often called by `check_conditions` or `post_solve`) must be run before `calc_stable_points` to populate `self.bilt` and `self.conditions`."
             )
-            return
-        if not hasattr(self, "solution"):
-            _log.warning(
-                "The solve method must be run before the calc_stable_points method."
-            )
+            solution_object.mNrmStE = np.nan
+            solution_object.mNrmTrg = np.nan
             return
 
-        # Extract balanced growth and delta m_t+1 = 0 functions
+        if not hasattr(solution_object, 'cFunc') or not callable(solution_object.cFunc):
+            _log.warning(
+                "The provided solution_object does not have a callable cFunc attribute. Cannot calculate stable points."
+            )
+            solution_object.mNrmStE = np.nan
+            solution_object.mNrmTrg = np.nan
+            return
+
+        # Extract balanced growth and delta m_t+1 = 0 functions from agent's bilt
         BalGroFunc = self.bilt["BalGroFunc"]
         Delta_mNrm_ZeroFunc = self.bilt["Delta_mNrm_ZeroFunc"]
+        mNrmStE = np.nan
+        mNrmTrg = np.nan
 
-        # If the GICRaw holds, then there is a balanced growth market resources ratio
-        if self.conditions["GICRaw"]:
-            cFunc = self.solution[0].cFunc
-            func_to_zero = lambda m: BalGroFunc(m) - cFunc(m)
-            m0 = 1.0
+        # If the GICRaw holds for the agent, then a balanced growth market resources ratio might exist
+        if self.conditions.get("GICRaw", False): # Use .get for safety if conditions dict is ever incomplete
+            cFunc = solution_object.cFunc # Use cFunc from the passed solution object
+            
+            # Calculate mNrmStE
+            func_to_zero_ste = lambda m: BalGroFunc(m) - cFunc(m)
+            m0_ste = 1.0 # Initial guess
             try:
-                mNrmStE = newton(func_to_zero, m0)
-            except:
-                mNrmStE = np.nan
+                # Check if cFunc is a NullFunc, which would cause newton to fail
+                if isinstance(cFunc, NullFunc) or (hasattr(cFunc, 'y_list') and not np.any(cFunc.y_list)): # Basic check for uninitialized interp
+                     _log.warning("cFunc on solution_object appears to be a NullFunc or uninitialized. Cannot calculate mNrmStE.")
+                else:
+                    mNrmStE = newton(func_to_zero_ste, m0_ste, tol=1e-8, maxiter=150) # Add tol and maxiter
+            except (RuntimeError, OverflowError) as e: # Catch potential errors from newton
+                _log.warning(f"Failed to calculate mNrmStE using newton: {e}")
+            except Exception as e: # Catch any other unexpected errors
+                _log.error(f"Unexpected error calculating mNrmStE: {e}")
 
-            # A target level of assets *might* exist even if the GICMod fails, so check no matter what
-            func_to_zero = lambda m: Delta_mNrm_ZeroFunc(m) - cFunc(m)
-            m0 = 1.0 if np.isnan(mNrmStE) else mNrmStE
+
+            # Calculate mNrmTrg (target market resources)
+            # A target level might exist even if GICRaw fails or mNrmStE is NaN,
+            # but calculation often starts near mNrmStE if available.
+            func_to_zero_trg = lambda m: Delta_mNrm_ZeroFunc(m) - cFunc(m)
+            m0_trg = m0_ste if np.isnan(mNrmStE) else mNrmStE # Use mNrmStE as starting point if available
+            if np.isnan(m0_trg) : m0_trg = 1.0 # Ensure m0_trg is a float
+
             try:
-                mNrmTrg = newton(func_to_zero, m0, maxiter=200)
-            except:
-                mNrmTrg = np.nan
+                if isinstance(cFunc, NullFunc) or (hasattr(cFunc, 'y_list') and not np.any(cFunc.y_list)):
+                     _log.warning("cFunc on solution_object appears to be a NullFunc or uninitialized. Cannot calculate mNrmTrg.")
+                else:
+                    mNrmTrg = newton(func_to_zero_trg, m0_trg, tol=1e-8, maxiter=150)
+            except (RuntimeError, OverflowError) as e:
+                _log.warning(f"Failed to calculate mNrmTrg using newton: {e}")
+            except Exception as e:
+                _log.error(f"Unexpected error calculating mNrmTrg: {e}")
         else:
-            mNrmStE = np.nan
-            mNrmTrg = np.nan
+            _log.info("GICRaw condition not met for the agent, mNrmStE and mNrmTrg will be NaN.")
 
-        self.solution[0].mNrmStE = mNrmStE
-        self.solution[0].mNrmTrg = mNrmTrg
-        self.bilt["mNrmStE"] = mNrmStE
-        self.bilt["mNrmTrg"] = mNrmTrg
+        # Store results on the provided solution_object
+        solution_object.mNrmStE = mNrmStE
+        solution_object.mNrmTrg = mNrmTrg
+        
+        # Also update self.bilt for general agent info, though primary is solution_object
+        if hasattr(self, 'bilt'): # Ensure bilt exists
+            self.bilt["mNrmStE"] = mNrmStE
+            self.bilt["mNrmTrg"] = mNrmTrg
 
 
 ###############################################################################

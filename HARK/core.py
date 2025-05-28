@@ -816,6 +816,10 @@ class AgentType(Model):
         quiet=False,
         seed=0,
         construct=True,
+        distance_metric_name: str = None,
+        report_metric_used: bool = False,
+        refined_distance_metric_name: str = None, # For two-stage convergence
+        refined_tolerance: float = None,          # For two-stage convergence
         **kwds,
     ):
         super().__init__()
@@ -833,6 +837,10 @@ class AgentType(Model):
         self.quiet = quiet
         set_verbosity_level((4 - verbose) * 10)
         self.seed = seed  # NOQA
+        self.distance_metric_name = distance_metric_name
+        self.report_metric_used = report_metric_used
+        self.refined_distance_metric_name = refined_distance_metric_name # Store new parameter
+        self.refined_tolerance = refined_tolerance                   # Store new parameter
         self.track_vars = []  # NOQA
         self.state_now = {sv: None for sv in self.state_vars}
         self.state_prev = self.state_now.copy()
@@ -1589,73 +1597,133 @@ def solve_agent(agent, verbose, from_solution=None):
         solution.insert(0, deepcopy(solution_last))
 
     # Initialize the process, then loop over cycles
-    go = True  # NOQA
-    completed_cycles = 0  # NOQA
-    max_cycles = 5000  # NOQA  - escape clause
+    converged = False
+    completed_cycles = 0
+    max_cycles = 5000  # escape clause
+    
+    # Initialize solution_distance for the case where completed_cycles remains 0 (e.g. T_cycle=0 models, though typically cycles=0 for infinite horizon)
+    # For finite horizon models (agent.cycles > 0), this loop structure might differ slightly or this variable might not be as central.
+    # The primary focus of this two-stage convergence is for infinite horizon models (agent.cycles == 0).
+    solution_distance = float('inf') 
+    refined_solution_distance = float('inf')
+
+
     if verbose:
         t_last = time()
-    while go:
-        # Solve a cycle of the model, recording it if horizon is finite
+
+    while not converged and completed_cycles < max_cycles:
+        # Solve a cycle of the model
         solution_cycle = solve_one_cycle(agent, solution_last)
+        solution_now = solution_cycle[0]
+
         if not infinite_horizon:
             solution = solution_cycle + solution
-
-        # Check for termination: identical solutions across
-        # cycle iterations or run out of cycles
-        solution_now = solution_cycle[0]
-        if infinite_horizon:
+            cycles_left -= 1
+            if cycles_left <= 0:
+                converged = True # Finite horizon model finishes its cycles
+        else: # Infinite horizon model
             if completed_cycles > 0:
-                solution_distance = solution_now.distance(solution_last)
-                agent.solution_distance = (
-                    solution_distance  # Add these attributes so users can
+                # Stage 1: Crude Convergence Check
+                crude_solution_distance = solution_now.distance(
+                    solution_last,
+                    metric_name=agent.distance_metric_name,
+                    report_metric_flag=agent.report_metric_used
                 )
-                agent.completed_cycles = (
-                    completed_cycles  # query them to see if solution is ready
-                )
-                go = (
-                    solution_distance > agent.tolerance
-                    and completed_cycles < max_cycles
-                )
-            else:  # Assume solution does not converge after only one cycle
-                solution_distance = 100.0
-                go = True
-        else:
-            cycles_left += -1
-            go = cycles_left > 0
+                agent.solution_distance = crude_solution_distance # Store the crude distance
 
-        # Update the "last period solution"
+                if agent.report_metric_used and hasattr(agent, 'history') and 'crude_distance_history' in agent.history:
+                    agent.history['crude_distance_history'].append(crude_solution_distance)
+
+
+                if crude_solution_distance <= agent.tolerance:
+                    # Crude convergence met, check for refined convergence if specified
+                    if agent.refined_distance_metric_name and agent.refined_tolerance is not None:
+                        # Populate data for refined metric if necessary
+                        if agent.refined_distance_metric_name in ["mNrmStE", "mNrmTrg"]:
+                            if hasattr(agent, 'calc_stable_points') and callable(agent.calc_stable_points):
+                                agent.calc_stable_points(solution_now)
+                                agent.calc_stable_points(solution_last) # Ensure solution_last also has it
+                            else:
+                                warn(f"AgentType {type(agent).__name__} needs 'calc_stable_points' method for refined metrics 'mNrmStE'/'mNrmTrg', but it's missing. Skipping refined check.")
+                                converged = True # Fallback to crude convergence
+                                solution_distance = crude_solution_distance # ensure this is set for verbose output
+                                refined_solution_distance = float('nan') # indicate not computed
+
+                        if not converged: # If not already fallen back
+                            refined_solution_distance = solution_now.distance(
+                                solution_last,
+                                metric_name=agent.refined_distance_metric_name,
+                                report_metric_flag=agent.report_metric_used
+                            )
+                            if agent.report_metric_used and hasattr(agent, 'history') and 'refined_distance_history' in agent.history:
+                                agent.history['refined_distance_history'].append(refined_solution_distance)
+                            
+                            agent.solution_distance = refined_solution_distance # Update to refined for reporting
+
+                            if refined_solution_distance <= agent.refined_tolerance:
+                                converged = True
+                            else:
+                                # Refined not met, loop continues. Crude is met, so solution_distance for print should be refined.
+                                solution_distance = refined_solution_distance 
+                                # If we want to ensure the loop continues based on crude_solution_distance > agent.tolerance,
+                                # we might need to artificially inflate crude_solution_distance here or simply rely on `not converged`.
+                                # The current loop condition `while not converged` handles this.
+                                pass 
+                        
+                    else: # No refined metric specified, crude convergence is sufficient
+                        converged = True
+                        solution_distance = crude_solution_distance
+                        refined_solution_distance = float('nan') if agent.refined_distance_metric_name else crude_solution_distance # For consistent reporting
+
+                else: # Crude convergence not met
+                    solution_distance = crude_solution_distance
+                    refined_solution_distance = float('nan') # Not yet in refined stage
+
+            else: # First cycle (completed_cycles == 0)
+                # No distance to compute yet, or handle as per existing logic for first cycle
+                solution_distance = float('inf') # Or some indicator that it's the first pass
+                refined_solution_distance = float('inf')
+
+
+        # Update for next iteration
         solution_last = solution_now
         completed_cycles += 1
+        agent.completed_cycles = completed_cycles # Store completed cycles on agent
 
-        # Display progress if requested
         if verbose:
             t_now = time()
             if infinite_horizon:
+                # Determine which distance to print based on what was computed
+                dist_to_print = refined_solution_distance if not np.isnan(refined_solution_distance) and refined_solution_distance != float('inf') else solution_distance
+                dist_label = "refined distance" if not np.isnan(refined_solution_distance) and refined_solution_distance != float('inf') else "solution distance"
+                
+                # If crude met but refined not, dist_to_print is refined. If crude not met, dist_to_print is crude.
+                # If crude met and no refined, dist_to_print is crude.
+                if crude_solution_distance <= agent.tolerance and agent.refined_distance_metric_name:
+                     dist_to_print = refined_solution_distance
+                     dist_label = "refined distance"
+                else:
+                     dist_to_print = crude_solution_distance
+                     dist_label = "solution distance"
+                
+                # Handle initial cycle where distance might be inf
+                if completed_cycles == 1 and solution_distance == float('inf'):
+                    print(f"Finished cycle #1 in {t_now - t_last:.4f} seconds (distance calculation begins next cycle).")
+                else:
+                    print(
+                        f"Finished cycle #{completed_cycles} in {t_now - t_last:.4f} seconds, {dist_label} = {dist_to_print:.8e}"
+                    )
+
+            else: # Finite horizon
                 print(
-                    "Finished cycle #"
-                    + str(completed_cycles)
-                    + " in "
-                    + str(t_now - t_last)
-                    + " seconds, solution distance = "
-                    + str(solution_distance)
-                )
-            else:
-                print(
-                    "Finished cycle #"
-                    + str(completed_cycles)
-                    + " of "
-                    + str(agent.cycles)
-                    + " in "
-                    + str(t_now - t_last)
-                    + " seconds."
+                    f"Finished period {agent.T_cycle - cycles_left} of {agent.T_cycle} in {t_now - t_last:.4f} seconds."
                 )
             t_last = t_now
+            sys.stdout.flush() # Ensure print happens immediately
 
-    # Record the last cycle if horizon is infinite (solution is still empty!)
+    # Final solution is the last computed cycle for infinite horizon
     if infinite_horizon:
-        solution = (
-            solution_cycle  # PseudoTerminal=False impossible for infinite horizon
-        )
+        solution = solution_cycle
 
     return solution
 
