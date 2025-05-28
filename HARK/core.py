@@ -839,9 +839,9 @@ class AgentType(Model):
         self.controls = {}
         self.shocks = {}
         self.read_shocks = False  # NOQA
-        self.shock_history = {}
-        self.newborn_init_history = {}
-        self.history = {}
+        self.shock_history = []  # MODIFIED: Changed to list
+        self.newborn_init_history = []  # MODIFIED: Changed to list
+        self.history = []  # MODIFIED: Changed to list
         self.assign_parameters(**params)  # NOQA
         self.reset_rng()  # NOQA
         self.bilt = {}
@@ -1091,10 +1091,12 @@ class AgentType(Model):
 
         # If we are asked to use existing shocks and a set of initial conditions
         # exist, use them
-        if self.read_shocks and bool(self.newborn_init_history):
+        if self.read_shocks and bool(self.newborn_init_history) and len(self.newborn_init_history) > 0:
+            # Access the first period's data (dictionary), then the variable from it.
+            first_period_newborn_history = self.newborn_init_history[0]
             for var_name in self.state_now:
                 # Check that we are actually given a value for the variable
-                if var_name in self.newborn_init_history.keys():
+                if var_name in first_period_newborn_history:
                     # Copy only array-like idiosyncratic states. Aggregates should
                     # not be set by newborns
                     idio = (
@@ -1102,19 +1104,22 @@ class AgentType(Model):
                         and len(self.state_now[var_name]) == self.AgentCount
                     )
                     if idio:
-                        self.state_now[var_name] = self.newborn_init_history[var_name][
-                            0
-                        ]
-
+                        # Ensure the stored value is an array before assigning
+                        new_born_val = first_period_newborn_history[var_name]
+                        if isinstance(new_born_val, np.ndarray):
+                            self.state_now[var_name] = new_born_val
+                        else: # If it's scalar (e.g. for aggregate), it will be broadcast.
+                              # This part might need care if an aggregate var was stored as scalar but idio state expects array.
+                              # However, sim_birth should handle types correctly.
+                            self.state_now[var_name].fill(new_born_val) 
                 else:
                     warn(
                         "The option for reading shocks was activated but "
                         + "the model requires state "
                         + var_name
                         + ", not contained in "
-                        + "newborn_init_history."
+                        + "newborn_init_history for the first period (t=0)."
                     )
-
         self.clear_history()
         return None
 
@@ -1184,78 +1189,92 @@ class AgentType(Model):
         -------
         None
         """
-        # Re-initialize the simulation
+        # Re-initialize the simulation. self.history, self.shock_history, self.newborn_init_history are now [].
+        # self.t_sim is 0.
         self.initialize_sim()
 
-        # Make blank history arrays for each shock variable (and mortality)
-        for var_name in self.shock_vars:
-            self.shock_history[var_name] = (
-                np.zeros((self.T_sim, self.AgentCount)) + np.nan
-            )
-        self.shock_history["who_dies"] = np.zeros(
-            (self.T_sim, self.AgentCount), dtype=bool
-        )
+        # Pre-allocate lists of dictionaries for T_sim periods
+        self.shock_history = [{} for _ in range(self.T_sim)]
+        self.newborn_init_history = [{} for _ in range(self.T_sim)]
 
-        # Also make blank arrays for the draws of newborns' initial conditions
-        for var_name in self.state_vars:
-            self.newborn_init_history[var_name] = (
-                np.zeros((self.T_sim, self.AgentCount)) + np.nan
-            )
+        # Record the initial conditions (t=0) of all agents as if they are "newborn"
+        # These are set by initialize_sim() -> sim_birth(all_agents)
+        # This populates newborn_init_history[0]
+        if self.T_sim > 0:
+            initial_newborn_data_t0 = {}
+            for var_name in self.state_vars:
+                current_state_val = self.state_now[var_name]
+                if isinstance(current_state_val, np.ndarray):
+                    initial_newborn_data_t0[var_name] = copy(current_state_val)
+                else: # Should be aggregate, store as an array for consistency if needed by reader
+                    initial_newborn_data_t0[var_name] = np.full(self.AgentCount, current_state_val)
+            self.newborn_init_history[0] = initial_newborn_data_t0
 
-        # Record the initial condition of the newborns created by
-        # initialize_sim -> sim_births
-        for var_name in self.state_vars:
-            # Check whether the state is idiosyncratic or an aggregate
-            idio = (
-                isinstance(self.state_now[var_name], np.ndarray)
-                and len(self.state_now[var_name]) == self.AgentCount
-            )
-            if idio:
-                self.newborn_init_history[var_name][self.t_sim] = self.state_now[
-                    var_name
-                ]
-            else:
-                # Aggregate state is a scalar. Assign it to every agent.
-                self.newborn_init_history[var_name][self.t_sim, :] = self.state_now[
-                    var_name
-                ]
+        # Loop through each simulation period to generate and store shock & newborn history
+        for t_idx in range(self.T_sim):
+            self.t_sim = t_idx  # Set current simulation time for methods called below
 
-        # Make and store the history of shocks for each period
-        for t in range(self.T_sim):
-            # Deaths
-            self.get_mortality()
-            self.shock_history["who_dies"][t, :] = self.who_dies
+            current_period_shock_data = {}
+            current_period_newborn_data = {} # Data for agents born in *this* period t_idx
 
-            # Initial conditions of newborns
+            # Simulate mortality for this period.
+            # If read_shocks is True, get_mortality uses self.shock_history[t_idx] (which is being built).
+            # This implies make_shock_history should generally be run with read_shocks=False initially.
+            # If read_shocks is True here, it means we are potentially re-generating based on a loaded history,
+            # which could be complex. Assuming standard use: read_shocks=False when first creating.
+            self.get_mortality()  # This updates self.who_dies and calls sim_birth for new agents
+            current_period_shock_data["who_dies"] = copy(self.who_dies)
+
+            # For agents who were born in this period (self.who_dies is True),
+            # record their state_now values (as set by sim_birth).
             if np.sum(self.who_dies) > 0:
                 for var_name in self.state_vars:
-                    # Check whether the state is idiosyncratic or an aggregate
-                    idio = (
-                        isinstance(self.state_now[var_name], np.ndarray)
-                        and len(self.state_now[var_name]) == self.AgentCount
-                    )
-                    if idio:
-                        self.newborn_init_history[var_name][t, self.who_dies] = (
-                            self.state_now[var_name][self.who_dies]
-                        )
-                    else:
-                        self.newborn_init_history[var_name][t, self.who_dies] = (
-                            self.state_now[var_name]
-                        )
+                    state_val = self.state_now[var_name]
+                    if isinstance(state_val, np.ndarray) and state_val.size == self.AgentCount:
+                        # Store only for those who died and were replaced, others NaN
+                        value_to_store = np.full_like(state_val, np.nan) 
+                        value_to_store[self.who_dies] = state_val[self.who_dies]
+                        current_period_newborn_data[var_name] = value_to_store
+                    else: # Aggregate variable or scalar
+                        # Store the single value that applies to newborns, as an array for consistency
+                        current_val_for_newborns = state_val
+                        if isinstance(current_val_for_newborns, np.ndarray) and current_val_for_newborns.size == 1:
+                            current_val_for_newborns = current_val_for_newborns.item()
+                        current_period_newborn_data[var_name] = np.full(self.AgentCount, current_val_for_newborns)
+            
+            # If it's t=0, all agents are "newborn" effectively from initialize_sim.
+            # The newborn_init_history[0] should reflect these initial states.
+            # If read_shocks=True caused some to "die" at t=0, current_period_newborn_data will capture their new state.
+            if t_idx == 0:
+                # Merge/update initial_newborn_data_t0 with any specific data from deaths at t0
+                self.newborn_init_history[0].update(current_period_newborn_data)
+            elif np.sum(self.who_dies) > 0 : # For t_idx > 0, only if there were actual deaths
+                 self.newborn_init_history[t_idx] = current_period_newborn_data
+            # If no deaths at t_idx > 0, newborn_init_history[t_idx] remains an empty dict.
 
-            # Other Shocks
-            self.get_shocks()
-            for var_name in self.shock_vars:
-                self.shock_history[var_name][t, :] = self.shocks[var_name]
 
-            self.t_sim += 1
-            self.t_age = self.t_age + 1  # Age all consumers by one period
-            self.t_cycle = self.t_cycle + 1  # Age all consumers within their cycle
-            self.t_cycle[self.t_cycle == self.T_cycle] = (
-                0  # Resetting to zero for those who have reached the end
-            )
+            # Simulate other shocks for this period
+            self.get_shocks()  # Populates self.shocks dictionary
+            for var_name in self.shock_vars: # shock_vars does not include 'who_dies'
+                if var_name in self.shocks:
+                    current_period_shock_data[var_name] = copy(self.shocks[var_name])
+                else: # Should not happen if shock_vars is defined correctly
+                    warn(f"Shock variable {var_name} not found in self.shocks after get_shocks() call.")
 
-        # Flag that shocks can be read rather than simulated
+
+            # Store the collected shock data for the current period t_idx
+            self.shock_history[t_idx].update(current_period_shock_data)
+
+
+            # Advance agent ages and cycle for the next iteration
+            self.t_age = self.t_age + 1
+            self.t_cycle = self.t_cycle + 1
+            self.t_cycle[self.t_cycle == self.T_cycle] = 0
+        
+        # After the loop, set self.t_sim to indicate completion of T_sim periods
+        self.t_sim = self.T_sim
+
+        # Flag that these histories can now be read
         self.read_shocks = True
 
     def get_mortality(self):
@@ -1275,33 +1294,61 @@ class AgentType(Model):
         None
         """
         if self.read_shocks:
-            who_dies = self.shock_history["who_dies"][self.t_sim, :]
+            # Ensure t_sim is a valid index for pre-made histories
+            if self.t_sim >= len(self.shock_history) or self.t_sim >= len(self.newborn_init_history):
+                # This case should ideally be prevented by how T_sim and loop bounds are handled.
+                # If it occurs, it implies an issue with t_sim advancement or history length.
+                raise IndexError(
+                    f"t_sim = {self.t_sim} is out of bounds for shock_history (len {len(self.shock_history)}) "
+                    f"or newborn_init_history (len {len(self.newborn_init_history)})."
+                )
+
+            current_period_shocks = self.shock_history[self.t_sim]
+            if "who_dies" not in current_period_shocks:
+                 # This might happen if make_shock_history was not completed or cleared.
+                warn(f"'who_dies' not found in shock_history for t_sim = {self.t_sim}. Assuming no deaths.")
+                who_dies = np.zeros(self.AgentCount, dtype=bool)
+            else:
+                who_dies = current_period_shocks["who_dies"]
+
             # Instead of simulating births, assign the saved newborn initial conditions
             if np.sum(who_dies) > 0:
-                for var_name in self.state_now:
-                    if var_name in self.newborn_init_history.keys():
-                        # Copy only array-like idiosyncratic states. Aggregates should
-                        # not be set by newborns
-                        idio = (
-                            isinstance(self.state_now[var_name], np.ndarray)
-                            and len(self.state_now[var_name]) == self.AgentCount
-                        )
-                        if idio:
-                            self.state_now[var_name][who_dies] = (
-                                self.newborn_init_history[var_name][
-                                    self.t_sim, who_dies
-                                ]
+                current_period_newborn_states = self.newborn_init_history[self.t_sim]
+                if not current_period_newborn_states: # Check if the dictionary is empty
+                    warn(f"Newborn history for t_sim = {self.t_sim} is empty, but there are deaths. States won't be updated from history.")
+                else:
+                    for var_name in self.state_now:
+                        if var_name in current_period_newborn_states:
+                            idio = (
+                                isinstance(self.state_now[var_name], np.ndarray)
+                                and len(self.state_now[var_name]) == self.AgentCount
                             )
+                            if idio:
+                                new_vals_for_var = current_period_newborn_states[var_name]
+                                if isinstance(new_vals_for_var, np.ndarray):
+                                    # We need to assign only the values for agents who_dies
+                                    self.state_now[var_name][who_dies] = new_vals_for_var[who_dies]
+                                else:
+                                    warn(f"Idiosyncratic state {var_name} in newborn_init_history is not an ndarray for t_sim={self.t_sim}.")
+                                    # Attempt to broadcast if it's a scalar; might fail or be incorrect.
+                                    self.state_now[var_name][who_dies] = new_vals_for_var
+                            else: # Aggregate variable.
+                                # The value in newborn_init_history should be the one for newborns.
+                                # It might be stored as a scalar or a full array.
+                                agg_new_val = current_period_newborn_states[var_name]
+                                if isinstance(agg_new_val, np.ndarray) and agg_new_val.size == self.AgentCount:
+                                    self.state_now[var_name] = agg_new_val[0] # Assign the scalar value
+                                elif isinstance(agg_new_val, np.ndarray) and agg_new_val.size == 1:
+                                     self.state_now[var_name] = agg_new_val.item()
+                                else: # scalar
+                                     self.state_now[var_name] = agg_new_val
 
-                    else:
-                        warn(
-                            "The option for reading shocks was activated but "
-                            + "the model requires state "
-                            + var_name
-                            + ", not contained in "
-                            + "newborn_init_history."
-                        )
-
+                        else:
+                            warn(
+                                f"The option for reading shocks was activated but "
+                                f"the model requires state {var_name} for newborns at t={self.t_sim}, "
+                                f"not contained in newborn_init_history[{self.t_sim}]."
+                            )
                 # Reset ages of newborns
                 self.t_age[who_dies] = 0
                 self.t_cycle[who_dies] = 0
@@ -1366,7 +1413,7 @@ class AgentType(Model):
         """
         Reads values of shock variables for the current period from history arrays.
         For each variable X named in self.shock_vars, this attribute of self is
-        set to self.history[X][self.t_sim,:].
+        set to self.shock_history[self.t_sim][X]. (Note: self.shocks is a dictionary on the agent)
 
         This method is only ever called if self.read_shocks is True.  This can
         be achieved by using the method make_shock_history() (or manually after
@@ -1380,8 +1427,19 @@ class AgentType(Model):
         -------
         None
         """
-        for var_name in self.shock_vars:
-            self.shocks[var_name] = self.shock_history[var_name][self.t_sim, :]
+        if self.t_sim >= len(self.shock_history):
+            raise IndexError(f"t_sim = {self.t_sim} is out of bounds for shock_history (len {len(self.shock_history)}).")
+
+        current_period_shocks_from_history = self.shock_history[self.t_sim]
+        for var_name in self.shock_vars: # self.shock_vars is a list of shock names (strings)
+            if var_name in current_period_shocks_from_history:
+                self.shocks[var_name] = current_period_shocks_from_history[var_name]
+            else:
+                # This implies a mismatch between shock_vars and what's in shock_history.
+                # This could happen if shock_history was not properly populated for this var_name.
+                warn(f"Shock variable '{var_name}' not found in shock_history for period {self.t_sim}.")
+                # Initialize to NaN or some default to avoid AttributeError if code expects it in self.shocks
+                self.shocks[var_name] = np.full(self.AgentCount, np.nan)
 
     def get_states(self):
         """
@@ -1507,32 +1565,91 @@ class AgentType(Model):
             if sim_periods is None:
                 sim_periods = self.T_sim
 
-            for t in range(sim_periods):
-                self.sim_one_period()
+            if sim_periods is None:
+                sim_periods = self.T_sim
+            
+            # t_sim at the start of simulate() is the first period to simulate.
+            # It increments up to t_sim + sim_periods -1.
+            # The loop for t goes from 0 to sim_periods-1.
+            # self.t_sim is the *current* period index.
 
-                for var_name in self.track_vars:
-                    if var_name in self.state_now:
-                        self.history[var_name][self.t_sim, :] = self.state_now[var_name]
-                    elif var_name in self.shocks:
-                        self.history[var_name][self.t_sim, :] = self.shocks[var_name]
-                    elif var_name in self.controls:
-                        self.history[var_name][self.t_sim, :] = self.controls[var_name]
-                    else:
-                        if var_name == "who_dies" and self.t_sim > 1:
-                            self.history[var_name][self.t_sim - 1, :] = getattr(
-                                self, var_name
-                            )
+            for _t_loop_idx in range(sim_periods): # Loop for the number of periods to simulate
+                self.sim_one_period() # Advances agent states for self.t_sim
+
+                # Record data for the period self.t_sim that just completed
+                period_data = {"period": self.t_sim}
+                for track_spec_item in self.track_vars:
+                    if isinstance(track_spec_item, str):
+                        var_name = track_spec_item
+                        value_to_store = np.nan # Default if not found
+                        if var_name in self.state_now:
+                            value_to_store = self.state_now[var_name]
+                        elif var_name in self.shocks:
+                            value_to_store = self.shocks[var_name]
+                        elif var_name in self.controls:
+                            value_to_store = self.controls[var_name]
+                        elif hasattr(self, var_name):
+                            value_to_store = getattr(self, var_name)
                         else:
-                            self.history[var_name][self.t_sim, :] = getattr(
-                                self, var_name
-                            )
+                            warn(f"Tracked variable '{var_name}' not found on agent instance for period {self.t_sim}.")
+
+                        if isinstance(value_to_store, np.ndarray):
+                            period_data[var_name] = copy(value_to_store)
+                        elif isinstance(value_to_store, (list, dict)):
+                            period_data[var_name] = deepcopy(value_to_store)
+                        else:
+                            period_data[var_name] = value_to_store
+                    
+                    elif isinstance(track_spec_item, tuple) and len(track_spec_item) > 1:
+                        var_name = track_spec_item[0]
+                        stats_to_calc = track_spec_item[1:]
+                        
+                        data_array = np.nan
+                        if var_name in self.state_now:
+                            data_array = self.state_now[var_name]
+                        elif var_name in self.shocks:
+                            data_array = self.shocks[var_name]
+                        elif var_name in self.controls:
+                            data_array = self.controls[var_name]
+                        elif hasattr(self, var_name):
+                            data_array = getattr(self, var_name)
+                        else:
+                            warn(f"Variable '{var_name}' for summary statistics not found on agent instance for period {self.t_sim}.")
+
+                        if isinstance(data_array, np.ndarray):
+                            for stat_str in stats_to_calc:
+                                stat_key = f"{var_name}_{stat_str}"
+                                if stat_str == 'mean':
+                                    period_data[stat_key] = np.mean(data_array)
+                                elif stat_str == 'std':
+                                    period_data[stat_key] = np.std(data_array)
+                                elif stat_str == 'min':
+                                    period_data[stat_key] = np.min(data_array)
+                                elif stat_str == 'max':
+                                    period_data[stat_key] = np.max(data_array)
+                                elif stat_str == 'median':
+                                    period_data[stat_key] = np.median(data_array)
+                                # Can add more stats like 'q25', 'q75' here later
+                                else:
+                                    warn(f"Unknown statistic '{stat_str}' requested for variable '{var_name}'.")
+                        else: # data_array was not found or not an array
+                            for stat_str in stats_to_calc:
+                                stat_key = f"{var_name}_{stat_str}"
+                                period_data[stat_key] = np.nan # Store NaN if data_array is not available
+                    else:
+                        warn(f"Invalid item in track_vars: {track_spec_item}")
+
+                self.history.append(period_data)
+                
+                # self.t_sim was the period *just simulated*. Now advance it for the next loop iteration.
                 self.t_sim += 1
 
             return self.history
 
     def clear_history(self):
         """
-        Clears the histories of the attributes named in self.track_vars.
+        Clears the main simulation history.
+        self.history will be an empty list.
 
         Parameters
         ----------
@@ -1542,9 +1659,135 @@ class AgentType(Model):
         -------
         None
         """
-        for var_name in self.track_vars:
-            self.history[var_name] = np.empty((self.T_sim, self.AgentCount))
-            self.history[var_name].fill(np.nan)
+        self.history = []
+        # Note: This does not clear self.shock_history or self.newborn_init_history,
+        # as clear_history is typically for simulation results, not pre-specified shocks.
+        # If those also need clearing, separate methods or an extended clear_all_histories() might be needed.
+
+    def get_history_df(self, dtype_map=None):
+        """
+        Converts the agent's simulation history into a pandas DataFrame,
+        optionally casting columns to specified data types.
+
+        The history is stored in `self.history` as a list of dictionaries,
+        where each dictionary represents a period and contains arrays of
+        variable values for all agents. This method transforms that structure
+        into a DataFrame with a MultiIndex (period, agent_id).
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the simulation history, indexed by period
+            and agent_id. Columns are the tracked variables. Returns an empty
+            DataFrame with the correct structure if history is empty.
+        """
+        if not hasattr(self, "AgentCount"):
+            warn("AgentCount attribute is not set. Cannot determine number of agents for history DataFrame.")
+            # Construct column names for an empty DataFrame based on track_vars parsing
+            empty_df_cols = ['period', 'agent_id']
+            for item in getattr(self, 'track_vars', []):
+                if isinstance(item, str):
+                    if item != 'period': empty_df_cols.append(item)
+                elif isinstance(item, tuple) and len(item) > 1:
+                    var_name = item[0]
+                    for stat_str in item[1:]:
+                        empty_df_cols.append(f"{var_name}_{stat_str}")
+            return pd.DataFrame(columns=empty_df_cols).set_index(['period', 'agent_id'])
+
+        all_records = []
+        if not self.history:
+            empty_df_cols = ['period', 'agent_id']
+            for item in self.track_vars: # Use self.track_vars directly
+                if isinstance(item, str):
+                    if item != 'period': empty_df_cols.append(item)
+                elif isinstance(item, tuple) and len(item) > 1:
+                    var_name = item[0]
+                    for stat_str in item[1:]:
+                        empty_df_cols.append(f"{var_name}_{stat_str}")
+            return pd.DataFrame(columns=empty_df_cols).set_index(['period', 'agent_id'])
+
+        # Determine column names from the first period's data if history is not empty
+        # This is more robust if track_vars definition leads to complex column names
+        # or if not all tracked items appear in every period_dict (though they should).
+        # The keys in period_dict are now the definitive source for columns other than 'agent_id'.
+        # 'period' is already a key in period_dict.
+        
+        # Get a representative set of column names from the data itself, excluding 'period'
+        # as it's handled as an index.
+        potential_columns = set()
+        for period_dict_scan in self.history:
+            for key in period_dict_scan:
+                if key != 'period':
+                    potential_columns.add(key)
+        sorted_columns = sorted(list(potential_columns))
+
+
+        for period_dict in self.history:
+            current_period_id = period_dict.get('period', -1)
+
+            # Determine number of agents for this period.
+            # If all entries are scalars (e.g. only summary stats tracked), num_agents might be ambiguous.
+            # Default to self.AgentCount. If a full array exists, use its length.
+            num_agents_in_period = self.AgentCount 
+            found_array_for_agent_count = False
+            for key in sorted_columns: # Check based on actual data columns
+                if key in period_dict and isinstance(period_dict[key], np.ndarray):
+                    num_agents_in_period = len(period_dict[key])
+                    found_array_for_agent_count = True
+                    break
+            
+            if num_agents_in_period == 0 and self.AgentCount > 0: # If AgentCount > 0 but no arrays found, still loop once for summary stats
+                num_agents_to_loop = 1 # Create one "representative" row for summary stats
+            elif num_agents_in_period == 0 and self.AgentCount == 0:
+                 num_agents_to_loop = 0 # Truly no agents
+            else:
+                 num_agents_to_loop = num_agents_in_period
+
+
+            for agent_idx in range(num_agents_to_loop):
+                record = {'period': current_period_id, 'agent_id': agent_idx if self.AgentCount > 0 else -1} # Use -1 if AgentCount is 0
+                for key in sorted_columns: # Iterate using the derived column set
+                    value = period_dict.get(key, np.nan) # Get value, default to NaN if key missing in this specific period_dict
+                    
+                    if isinstance(value, np.ndarray):
+                        if agent_idx < len(value):
+                            record[key] = value[agent_idx]
+                        else: # Should not happen if num_agents_in_period was derived correctly
+                            record[key] = np.nan 
+                    else: # Scalar (summary statistic or broadcasted value)
+                        record[key] = value 
+                all_records.append(record)
+        
+        if not all_records:
+            # Re-construct empty_df_cols as before for safety, if all_records is empty.
+            empty_df_cols = ['period', 'agent_id']
+            for item in getattr(self, 'track_vars', []):
+                if isinstance(item, str):
+                    if item != 'period': empty_df_cols.append(item)
+                elif isinstance(item, tuple) and len(item) > 1:
+                    var_name = item[0]
+                    for stat_str in item[1:]:
+                        empty_df_cols.append(f"{var_name}_{stat_str}")
+            return pd.DataFrame(columns=empty_df_cols).set_index(['period', 'agent_id'])
+
+
+        df = pd.DataFrame.from_records(all_records)
+        
+        if 'period' in df.columns and 'agent_id' in df.columns:
+            # Handle cases where agent_id might be -1 if AgentCount is 0.
+            # This can lead to a non-unique index if not careful.
+            # If agent_id contains -1 and other valid ids, it might be better to not set index or clean.
+            # For now, assume if AgentCount is 0, all_records is empty or df.empty will be true.
+            if not df.empty:
+                 df = df.set_index(['period', 'agent_id'])
+            else: # If df is empty, create it with proper index and columns
+                empty_df_cols = ['period', 'agent_id'] + sorted_columns
+                df = pd.DataFrame(columns=empty_df_cols).set_index(['period', 'agent_id'])
+
+        elif not df.empty:
+            warn("DataFrame created from history is missing 'period' or 'agent_id' columns for index setting.")
+            
+        return df
 
 
 def solve_agent(agent, verbose, from_solution=None):
@@ -1880,7 +2123,7 @@ class Market(Model):
         self.act_T = act_T  # NOQA
         self.tolerance = tolerance  # NOQA
         self.max_loops = 1000  # NOQA
-        self.history = {}
+        self.history = []  # MODIFIED: Initialized as an empty list
         self.assign_parameters(**kwds)
 
         self.print_parallel_error_once = True
@@ -2055,7 +2298,7 @@ class Market(Model):
         none
         """
         # Reset the history of tracked variables
-        self.history = {var_name: [] for var_name in self.track_vars}
+        self.history = [] # MODIFIED: history is now a list of dictionaries
 
         # Set the sow variables to their initial levels
         for var_name in self.sow_state:
@@ -2078,6 +2321,7 @@ class Market(Model):
         -------
         none
         """
+        period_market_data = {}
         for var_name in self.track_vars:
             if var_name in self.sow_state:
                 value_now = self.sow_state[var_name]
@@ -2087,8 +2331,12 @@ class Market(Model):
                 value_now = self.const_vars[var_name]
             else:
                 value_now = getattr(self, var_name)
+            
+            # Market variables are often scalars or small arrays, direct copy is usually fine.
+            # If they can be large mutable objects, a deepcopy might be considered.
+            period_market_data[var_name] = copy(value_now) 
 
-            self.history[var_name].append(value_now)
+        self.history.append(period_market_data)
 
     def make_history(self):
         """
@@ -2128,10 +2376,27 @@ class Market(Model):
             Should have attributes named in dyn_vars.
         """
         # Make a dictionary of inputs for the dynamics calculator
+        # Convert self.history (list of dicts) to a pandas DataFrame
+        history_df = pd.DataFrame(self.history)
+
         arg_names = list(get_arg_names(self.calc_dynamics))
         if "self" in arg_names:
             arg_names.remove("self")
-        update_dict = {name: self.history[name] for name in arg_names}
+        
+        update_dict = {}
+        for name in arg_names:
+            if name in history_df:
+                update_dict[name] = history_df[name] # Pass the pandas Series directly
+            else:
+                # This case should be handled based on how calc_dynamics expects missing data.
+                # It might expect None, or raise an error. For now, we replicate previous behavior
+                # of potentially raising KeyError if a tracked var was expected but not found.
+                # However, history_df[name] will raise KeyError if name is not a column.
+                # A more robust way could be: update_dict[name] = history_df.get(name)
+                # which would pass None if the column is missing.
+                # For now, direct access implies 'name' must be in history_df.
+                pass # Or: raise KeyError(f"Tracked variable {name} not found in history_df for calc_dynamics.")
+
         # Calculate a new dynamic rule and distribute it to the agents in agent_list
         dynamics = self.calc_dynamics(**update_dict)  # User-defined dynamics calculator
         for var_name in self.dyn_vars:

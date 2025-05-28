@@ -3,8 +3,10 @@ This file implements unit tests for core HARK functionality.
 """
 
 import unittest
+import warnings # For self.assertWarns
 
 import numpy as np
+import pandas as pd # Add pandas import
 import pytest
 from copy import deepcopy
 
@@ -282,3 +284,180 @@ class TestSolveFrom(unittest.TestCase):
         # The solutions (up to 2) must be the same
         for t, s2 in enumerate(agent_2.solution):
             self.assertEqual(s2.distance(agent.solution[t]), 0.0)
+
+
+class TestAgentTypeHistory(unittest.TestCase):
+    def setUp(self):
+        """
+        Set up a basic IndShockConsumerType agent for history testing.
+        """
+        self.params = init_idiosyncratic_shocks.copy()
+        self.params.update({
+            'AgentCount': 3,
+            'T_sim': 2, # Simulate for 2 periods (0 and 1)
+            'T_cycle': 1, # To keep it simple, lifecycle of 1 period for model solution
+            'track_vars': ['mNrm', 'cNrm', 'pLvl', 't_age'] # Example tracked variables
+        })
+        self.agent = IndShockConsumerType(**self.params)
+        # Solve the model so simulation can run
+        self.agent.solve()
+        # Initialize simulation (not running it yet, just setting up t_sim etc.)
+        self.agent.initialize_sim()
+
+
+    def test_get_history_df_structure_and_content(self):
+        """
+        Test the structure and basic content of the DataFrame returned by get_history_df.
+        """
+        # Simulate the agent
+        self.agent.simulate()
+        df = self.agent.get_history_df()
+
+        # Test DataFrame structure
+        self.assertIsInstance(df, pd.DataFrame)
+        self.assertIsInstance(df.index, pd.MultiIndex)
+        self.assertEqual(df.index.names, ['period', 'agent_id'])
+        
+        # Test columns - ensure 'period' from dict key is not a column
+        expected_columns = [v for v in self.agent.track_vars if v != 'period']
+        self.assertListEqual(sorted(list(df.columns)), sorted(expected_columns))
+
+        # Test number of rows
+        self.assertEqual(len(df), self.agent.T_sim * self.agent.AgentCount)
+
+        # Test some content (very basic check, assumes simulation runs without error)
+        # For period 0, agent 0, check if mNrm exists (it's a tracked var)
+        self.assertTrue('mNrm' in df.columns)
+        # Example: check a specific value if we had a very predictable model.
+        # For IndShockConsumerType, exact values are complex to predict without deep model knowledge.
+        # So, we mostly check presence and type.
+        first_period_agent_0_mNrm = df.loc[(0, 0), 'mNrm']
+        self.assertIsNotNone(first_period_agent_0_mNrm)
+        self.assertIsInstance(first_period_agent_0_mNrm, (float, np.float64, np.float32))
+
+        # Check t_age content
+        # Period 0, all agents should have t_age = 0 (as per initialize_sim and first period data)
+        # Period 1, all agents should have t_age = 1
+        for p_idx in range(self.agent.T_sim):
+            for a_idx in range(self.agent.AgentCount):
+                # t_age in history reflects age at the *start* of the period `p_idx`'s simulation step
+                # or rather, the age *during* period `p_idx`.
+                # If t_sim is the period index in history:
+                # history[0] (period 0) -> t_age is 0
+                # history[1] (period 1) -> t_age is 1
+                self.assertEqual(df.loc[(p_idx, a_idx), 't_age'], p_idx)
+
+
+    def test_get_history_df_empty_history(self):
+        """
+        Test get_history_df when the simulation history is empty.
+        """
+        # Agent is initialized in setUp, but simulate() is not called here.
+        # So, self.agent.history should be []
+        df = self.agent.get_history_df()
+
+        self.assertTrue(df.empty)
+        self.assertIsInstance(df.index, pd.MultiIndex)
+        self.assertEqual(df.index.names, ['period', 'agent_id'])
+        # Columns should still be the track_vars
+        expected_columns = [v for v in self.agent.track_vars if v != 'period']
+        self.assertListEqual(sorted(list(df.columns)), sorted(expected_columns))
+
+    def test_get_history_df_empty_track_vars(self):
+        """
+        Test get_history_df when agent.track_vars is empty.
+        """
+        self.agent.track_vars = []
+        # Simulate to populate history (even if no vars are tracked, period/agent_id should exist)
+        self.agent.simulate() 
+        df = self.agent.get_history_df()
+
+        self.assertIsInstance(df.index, pd.MultiIndex)
+        self.assertEqual(df.index.names, ['period', 'agent_id'])
+        self.assertTrue(df.columns.empty) # No columns other than index
+        
+        # Should still have rows for each period-agent combination
+        self.assertEqual(len(df), self.agent.T_sim * self.agent.AgentCount)
+
+    def test_get_history_df_agent_count_zero(self):
+        """
+        Test get_history_df when AgentCount is 0.
+        """
+        self.params_zero_agents = init_idiosyncratic_shocks.copy()
+        self.params_zero_agents.update({
+            'AgentCount': 0,
+            'T_sim': 2,
+            'T_cycle': 1,
+            'track_vars': ['mNrm', 'cNrm']
+        })
+        agent_zero = IndShockConsumerType(**self.params_zero_agents)
+        agent_zero.solve()
+        agent_zero.initialize_sim()
+        # agent_zero.simulate() # Simulate might have issues with 0 agents depending on implementation
+        
+        # If simulate() is called and history is populated with empty arrays for vars:
+        # The current get_history_df might create 0 rows.
+        # If simulate() itself errors or history is truly empty:
+        df = agent_zero.get_history_df()
+
+        self.assertTrue(df.empty)
+        self.assertIsInstance(df.index, pd.MultiIndex)
+        self.assertEqual(df.index.names, ['period', 'agent_id'])
+        expected_columns = [v for v in agent_zero.track_vars if v != 'period']
+        self.assertListEqual(sorted(list(df.columns)), sorted(expected_columns))
+
+    def test_get_history_df_dtype_map_basic(self):
+        """
+        Test basic dtype casting using dtype_map.
+        """
+        self.agent.simulate()
+        dtype_map = {'mNrm': 'float32', 't_age': 'int16', 'cNrm': np.float16}
+        df = self.agent.get_history_df(dtype_map=dtype_map)
+
+        self.assertEqual(df['mNrm'].dtype, np.dtype('float32'))
+        self.assertEqual(df['t_age'].dtype, np.dtype('int16'))
+        self.assertEqual(df['cNrm'].dtype, np.dtype('float16'))
+        # pLvl was in track_vars but not in dtype_map, should retain its original type (likely float64)
+        self.assertTrue(np.issubdtype(df['pLvl'].dtype, np.floating))
+
+
+    def test_get_history_df_dtype_map_invalid_cast(self):
+        """
+        Test that a warning is issued for invalid type casting attempts
+        and the original dtype (or numeric coerced) is retained.
+        """
+        self.agent.simulate() # mNrm will have float values
+
+        # Attempt to cast float 'mNrm' to 'int8' which might fail or lose precision significantly
+        # and is a good candidate for pd.to_numeric to coerce to NaN if it were a string.
+        # Here, we expect astype to potentially raise an error caught by the warning system.
+        original_mNrm_dtype = self.agent.get_history_df()['mNrm'].dtype
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always") # Capture all warnings
+            df = self.agent.get_history_df(dtype_map={'mNrm': 'int8'})
+            
+            # Check if a UserWarning related to casting was issued
+            self.assertTrue(any(issubclass(warn.category, UserWarning) and 
+                                "Could not cast column 'mNrm'" in str(warn.message) for warn in w))
+        
+        # Dtype should ideally be the original, or what pd.to_numeric made it if that step ran.
+        # Since 'mNrm' is already numeric, pd.to_numeric won't change its float status before astype.
+        # If astype('int8') fails due to values (e.g. NaN, Inf, or too large/small),
+        # it would raise an error, caught by get_history_df, and the column remains float.
+        self.assertEqual(df['mNrm'].dtype, original_mNrm_dtype)
+
+
+    def test_get_history_df_dtype_map_column_not_found(self):
+        """
+        Test that a warning is issued if a column in dtype_map is not found.
+        """
+        self.agent.simulate()
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            df = self.agent.get_history_df(dtype_map={'non_existent_col': 'float32'})
+            
+            self.assertTrue(any(issubclass(warn.category, UserWarning) and
+                                "not found in DataFrame" in str(warn.message) for warn in w))
+        # Ensure other columns are still present
+        self.assertTrue('mNrm' in df.columns)

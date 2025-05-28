@@ -126,11 +126,10 @@ def parse_scf_distr_stats(age=None, education=None, wave=None):
             + "statistics."
         )
 
-    # to_dict transforms BASE_YR to float from int. Manually fix this
-    row_dict = row.to_dict()
-    row_dict["BASE_YR"] = int(row_dict["BASE_YR"])
-
-    return row_dict
+    # The row is a pandas Series.
+    # The dtype for BASE_YR is set to int in read_csv, so it should be correct.
+    # If it were not, we could do: row['BASE_YR'] = int(row['BASE_YR'])
+    return row
 
 
 def income_wealth_dists_from_scf(base_year, age=None, education=None, wave=None):
@@ -166,11 +165,13 @@ def income_wealth_dists_from_scf(base_year, age=None, education=None, wave=None)
         of permanent income and normalized wealth.
     """
 
-    # Extract summary statistics from the SCF table
+    # Extract summary statistics from the SCF table.
+    # stats is now a pandas Series.
     stats = parse_scf_distr_stats(age, education, wave)
 
     # Find the deflator to adjust nominal quantities. The SCF summary files
     # use the september CPI measurement to deflate, so use that.
+    # Accessing elements from a Series is similar to a dict.
     deflator = cpi_deflator(
         from_year=stats["BASE_YR"], to_year=base_year, base_month="SEP"
     )[0]

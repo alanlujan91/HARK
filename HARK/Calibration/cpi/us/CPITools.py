@@ -115,12 +115,24 @@ def cpi_deflator(from_year, to_year, base_month=None):
 
     # Get cpi and subset the columns we need.
     cpi = get_cpi_series()
-    cpi_series = cpi[[column]].dropna()
+    # Ensure cpi_series_for_calc is a Series, not a DataFrame, by selecting the column directly.
+    cpi_series_for_calc = cpi[column].dropna()
 
     try:
-        deflator = np.divide(
-            cpi_series.loc[to_year].to_numpy(), cpi_series.loc[from_year].to_numpy()
-        )
+        # Perform division with pandas Series
+        to_val = cpi_series_for_calc.loc[to_year]
+        from_val = cpi_series_for_calc.loc[from_year]
+        
+        # Ensure these are scalars before division.
+        # With a unique index like 'year', .loc[year] on a Series should return a scalar.
+        # If the index was not unique, it could return a Series, hence the check.
+        if isinstance(to_val, pd.Series): to_val = to_val.iloc[0]
+        if isinstance(from_val, pd.Series): from_val = from_val.iloc[0]
+
+        # The original function returns a numpy array.
+        # If to_val and from_val are scalars, result is scalar.
+        deflator_val = to_val / from_val
+        deflator = np.array([deflator_val]) # Convert to length-1 numpy array
 
     except KeyError as e:
         message = (

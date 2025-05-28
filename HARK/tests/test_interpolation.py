@@ -10,10 +10,13 @@ from HARK.interpolation import (
     QuadlinearInterp,
 )
 from HARK.interpolation import CubicHermiteInterp as CubicInterp
+# Make HARK.interpolation available for HAS_NUMBA patching
+from HARK import interpolation as HARK_interpolation
 
 import numpy as np
 import unittest
-import numpy as np
+import timeit # For performance testing
+# numpy already imported, no need for second import
 
 
 class testsLinearInterp(unittest.TestCase):
@@ -247,3 +250,138 @@ class test_IdentityFunction(unittest.TestCase):
         assert np.all(self.zero == self.IF3Db.derivativeX(self.X, self.Y, self.Z))
         assert np.all(self.zero == self.IF3Db.derivativeY(self.X, self.Y, self.Z))
         assert np.all(self.one == self.IF3Db.derivativeZ(self.X, self.Y, self.Z))
+
+
+class TestLinearInterpNumba(unittest.TestCase):
+    def _run_comparative_test(self, x_grid, y_grid, test_points, **kwargs):
+        """
+        Helper function to compare Numba and Pure Python LinearInterp results.
+        """
+        # Ensure test_points is a numpy array
+        test_points_np = np.asarray(test_points)
+
+        # --- Numba version (or default if Numba not available/forced off) ---
+        # Ensure Numba is enabled for this part if available globally
+        original_has_numba_state = HARK_interpolation.HAS_NUMBA
+        HARK_interpolation.HAS_NUMBA = True # Try to enable Numba path
+        
+        interpolator_numba = LinearInterp(x_grid, y_grid, **kwargs)
+        y_numba = interpolator_numba(test_points_np)
+        dydx_numba = interpolator_numba.derivative(test_points_np)
+        
+        # Restore global Numba state
+        HARK_interpolation.HAS_NUMBA = original_has_numba_state
+
+        # --- Pure Python version ---
+        # Force HARK.interpolation.HAS_NUMBA to False to ensure pure Python path
+        HARK_interpolation.HAS_NUMBA = False
+        interpolator_py = LinearInterp(x_grid, y_grid, **kwargs)
+        y_py = interpolator_py(test_points_np)
+        dydx_py = interpolator_py.derivative(test_points_np)
+        
+        # Restore global Numba state
+        HARK_interpolation.HAS_NUMBA = original_has_numba_state
+
+        # Compare results
+        np.testing.assert_allclose(y_numba, y_py, rtol=1e-7, atol=1e-9, err_msg="Mismatch in __call__ output")
+        np.testing.assert_allclose(dydx_numba, dydx_py, rtol=1e-7, atol=1e-9, err_msg="Mismatch in derivative output")
+
+    def test_numerical_equivalence_simple(self):
+        x_grid = np.array([0.0, 1.0, 2.0, 3.0])
+        y_grid = np.array([0.0, 0.5, 1.5, 1.0])
+        test_points = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.75, 3.0, 3.5]
+        self._run_comparative_test(x_grid, y_grid, test_points)
+        self._run_comparative_test(x_grid, y_grid, 0.75) # Scalar test
+
+    def test_numerical_equivalence_lower_extrap(self):
+        x_grid = np.array([1.0, 2.0, 3.0])
+        y_grid = np.array([1.0, 0.5, 0.0])
+        test_points = [0.5, 1.0, 1.5, 2.5, 3.0, 3.5]
+        self._run_comparative_test(x_grid, y_grid, test_points, lower_extrap=True)
+
+    def test_numerical_equivalence_decay_extrap(self):
+        x_grid = np.array([0.0, 1.0, 2.0])
+        y_grid = np.array([0.0, 1.0, 1.5])
+        # For decay_extrap_A to be non-zero, level_diff must be non-zero.
+        # level_diff = intercept_limit + slope_limit * x_list[-1] - y_list[-1]
+        # slope_at_top = (1.5 - 1.0) / (2.0 - 1.0) = 0.5
+        # Let slope_limit = 0.2. Let intercept_limit = 1.0.
+        # level_diff = 1.0 + 0.2 * 2.0 - 1.5 = 1.0 + 0.4 - 1.5 = -0.1
+        # slope_diff = 0.2 - 0.5 = -0.3
+        # decay_extrap_A = -0.1
+        # decay_extrap_B = -(-0.3) / (-0.1) = 0.3 / -0.1 = -3.0
+        test_points = [-0.5, 0.5, 1.5, 2.0, 2.5, 3.0]
+        self._run_comparative_test(x_grid, y_grid, test_points, 
+                                   intercept_limit=1.0, slope_limit=0.2, lower_extrap=True)
+        
+        # Test case where decay_extrap would be false due to slope_limit == slope_at_top
+        self._run_comparative_test(x_grid, y_grid, test_points,
+                                   intercept_limit=y_grid[-1] - 0.5 * x_grid[-1], # intercept that matches slope_at_top
+                                   slope_limit=0.5, lower_extrap=True)
+
+
+    def test_numerical_equivalence_single_segment(self):
+        x_grid = np.array([1.0, 2.0])
+        y_grid = np.array([5.0, 10.0])
+        test_points = [0.5, 1.0, 1.5, 2.0, 2.5]
+        self._run_comparative_test(x_grid, y_grid, test_points, lower_extrap=True)
+
+    def test_numerical_equivalence_single_point_grid(self):
+        x_grid = np.array([1.0])
+        y_grid = np.array([5.0])
+        test_points = [0.5, 1.0, 1.5] # Should be constant function
+        self._run_comparative_test(x_grid, y_grid, test_points, lower_extrap=True)
+
+    def test_numerical_equivalence_empty_grid(self):
+        x_grid = np.array([])
+        y_grid = np.array([])
+        test_points = [0.5, 1.0, 1.5] # Should result in NaNs
+        self._run_comparative_test(x_grid, y_grid, test_points, lower_extrap=True)
+
+    @unittest.skipIf(not HARK_interpolation.HAS_NUMBA, "Numba not available, skipping performance test.")
+    def test_linear_interp_numba_performance(self):
+        print("\nRunning LinearInterp Numba Performance Comparison (higher is better for Numba speedup):")
+        x_grid = np.linspace(0, 100, 1000)
+        y_grid = np.sin(x_grid/10.0) # Some non-trivial function
+        x_test_points = np.random.rand(1000000) * 100
+        
+        number_of_reps = 10
+
+        # Time Numba path (if Numba is available)
+        # Ensure HARK_interpolation.HAS_NUMBA is its true detected state
+        original_has_numba_state = HARK_interpolation.HAS_NUMBA
+        HARK_interpolation.HAS_NUMBA = True # Force to true for this measurement if available globally
+        
+        interpolator_numba = LinearInterp(x_grid, y_grid)
+        
+        # Make sure Numba kernel is compiled before timing critical section
+        if HARK_interpolation.HAS_NUMBA and HARK_interpolation._numba_linear_interp_eval_or_der_jitted is not None:
+            interpolator_numba(np.array([x_grid[0],x_grid[-1]])) # Pre-compile
+            
+            numba_time = timeit.timeit(lambda: interpolator_numba(x_test_points), number=number_of_reps)
+            print(f"  Numba time ({number_of_reps} reps): {numba_time:.4f}s")
+        else:
+            numba_time = float('inf') # Should not happen if skipIf works
+            print("  Numba path not executed (should have been skipped).")
+
+        HARK_interpolation.HAS_NUMBA = original_has_numba_state # Restore state
+
+        # Time Pure Python path
+        HARK_interpolation.HAS_NUMBA = False 
+        interpolator_py = LinearInterp(x_grid, y_grid) 
+        # Pre-call to mimic any first-call overhead if relevant, though less so for Python
+        interpolator_py(np.array([x_grid[0], x_grid[-1]]))
+        
+        python_time = timeit.timeit(lambda: interpolator_py(x_test_points), number=number_of_reps)
+        print(f"  Python time ({number_of_reps} reps): {python_time:.4f}s")
+        HARK_interpolation.HAS_NUMBA = original_has_numba_state # Restore
+
+        if HARK_interpolation.HAS_NUMBA and HARK_interpolation._numba_linear_interp_eval_or_der_jitted is not None:
+            print(f"  Speedup (Python/Numba): {python_time/numba_time:.2f}x")
+            # Allowing Numba to be slightly slower in some edge cases or due to overhead,
+            # but expecting it to be faster for large arrays.
+            self.assertTrue(numba_time < python_time * 1.2, "Numba version was significantly slower than Python version.")
+        else:
+            # This part of the test effectively means Numba is not being tested for performance.
+            # The skipIf should prevent this from being a failure.
+            pass

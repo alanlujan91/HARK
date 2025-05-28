@@ -15,6 +15,15 @@ from scipy.interpolate import CubicHermiteSpline
 from HARK.metric import MetricObject
 from HARK.rewards import CRRAutility, CRRAutilityP, CRRAutilityPP
 
+try:
+    from numba import njit
+    HAS_NUMBA = True
+except ImportError:
+    HAS_NUMBA = False
+    # Define a dummy njit decorator if Numba is not available, so the code can still run
+    # by falling back to the pure Python version.
+    def njit(func):
+        return func
 
 def _isscalar(x):
     """
@@ -776,24 +785,153 @@ class LinearInterp(HARKinterpolator1D):
         self.lower_extrap = lower_extrap
         self.x_n = self.x_list.size
 
+        # Initialize decay extrapolation parameters
+        self.decay_extrap_A = None
+        self.decay_extrap_B = None
+        self.intercept_limit = None
+        self.slope_limit = None
+        self.decay_extrap = False
+
         # Make a decay extrapolation
         if intercept_limit is not None and slope_limit is not None:
-            slope_at_top = (y_list[-1] - y_list[-2]) / (x_list[-1] - x_list[-2])
-            level_diff = intercept_limit + slope_limit * x_list[-1] - y_list[-1]
-            slope_diff = slope_limit - slope_at_top
-            # If the model that can handle uncertainty has been calibrated with
-            # with uncertainty set to zero, the 'extrapolation' will blow up
-            # Guard against that and nearby problems by testing slope equality
-            if not np.isclose(slope_limit, slope_at_top, atol=1e-15):
-                self.decay_extrap_A = level_diff
-                self.decay_extrap_B = -slope_diff / level_diff
-                self.intercept_limit = intercept_limit
-                self.slope_limit = slope_limit
-                self.decay_extrap = True
-            else:
-                self.decay_extrap = False
+            if self.x_n > 1 : # Need at least two points to calculate slope_at_top
+                slope_at_top = (self.y_list[-1] - self.y_list[-2]) / (self.x_list[-1] - self.x_list[-2])
+                level_diff = intercept_limit + slope_limit * self.x_list[-1] - self.y_list[-1]
+                slope_diff = slope_limit - slope_at_top
+                # If the model that can handle uncertainty has been calibrated with
+                # with uncertainty set to zero, the 'extrapolation' will blow up
+                # Guard against that and nearby problems by testing slope equality
+                if not np.isclose(slope_limit, slope_at_top, atol=1e-15) and not np.isclose(level_diff, 0, atol=1e-15): # Avoid division by zero
+                    self.decay_extrap_A = level_diff
+                    self.decay_extrap_B = -slope_diff / level_diff
+                    self.intercept_limit = intercept_limit
+                    self.slope_limit = slope_limit
+                    self.decay_extrap = True
+                elif np.isclose(slope_limit, slope_at_top, atol=1e-15): # If slope is same, it's essentially linear beyond last segment
+                    self.decay_extrap = False # Fall back to linear extrapolation of last segment
+                # If level_diff is close to zero but slopes are different, it's a tricky case.
+                # Current logic will set decay_extrap to False. This implies linear extrapolation.
+            else: # Not enough points for decay extrapolation based on segment slope
+                self.decay_extrap = False # Fall back to linear extrapolation of last segment (if x_n=1, this is constant)
+
+
+    def _pure_python_eval_or_der(self, x, _eval, _Der):
+        """
+        Original pure Python implementation for level and/or first derivative.
+        """
+        # Ensure x is a numpy array for operations like searchsorted and boolean indexing
+        x_np = np.asarray(x)
+
+        # Initialize y and dydx with NaNs or zeros, matching x_np's shape
+        # This is important because Numba kernel will expect to fill pre-allocated arrays.
+        if _eval:
+            y = np.empty_like(x_np)
+            y.fill(np.nan)
         else:
-            self.decay_extrap = False
+            y = None # Or some indicator Numba can handle, like np.empty(0, dtype=x_np.dtype)
+
+        if _Der:
+            dydx = np.empty_like(x_np)
+            dydx.fill(np.nan)
+        else:
+            dydx = None # Or np.empty(0, dtype=x_np.dtype)
+        
+        if self.x_n == 0: # No grid points
+            # Outputs are already NaN-filled or None.
+            output = []
+            if _eval: output.append(y)
+            if _Der: output.append(dydx)
+            return output
+            
+        if self.x_n == 1: # Single point in grid, function is constant
+            if _eval:
+                y[:] = self.y_list[0]
+            if _Der:
+                dydx[:] = 0.0 # Derivative of a constant is 0
+            
+            output = []
+            if _eval: output.append(y)
+            if _Der: output.append(dydx)
+            return output
+
+        # Proceed with interpolation/extrapolation for x_n > 1
+        # np.searchsorted returns indices for an array sorted ascending.
+        # We want to find which segment each x falls into.
+        # For x < x_list[0], i will be 0.
+        # For x_list[0] <= x < x_list[1], i will be 1.
+        # ...
+        # For x_list[x_n-2] <= x < x_list[x_n-1], i will be x_n-1.
+        # For x >= x_list[x_n-1], i will be x_n.
+        # We adjust i to be the index of the *right* grid point of the segment.
+        # So, for x in [x_list[j-1], x_list[j]], i should be j.
+        # We use np.clip to keep i within valid array bounds for x_list and y_list.
+        i = np.searchsorted(self.x_list, x_np, side='left')
+        i = np.clip(i, 1, self.x_n -1) # Clip i for segments x_list[i-1] to x_list[i]
+
+        # Points exactly at grid points or within segments
+        # alpha is the fractional distance of x within the segment [x_list[i-1], x_list[i]]
+        # For points below x_list[0] or above x_list[x_n-1], alpha calculation needs care or separate handling.
+        
+        # Calculate for points within defined grid segments first
+        # Denominator for alpha; if x_list[i] == x_list[i-1], this is problematic.
+        # Assuming x_list has unique, sorted values.
+        seg_len = self.x_list[i] - self.x_list[i-1]
+        # Handle cases where seg_len might be zero to avoid division by zero if x_list is not strictly increasing.
+        # For robust code, one might add: seg_len[seg_len == 0] = 1e-8 (or handle as error)
+        alpha = (x_np - self.x_list[i-1]) / seg_len
+
+        if _eval:
+            y_val = (1.0 - alpha) * self.y_list[i-1] + alpha * self.y_list[i]
+        if _Der:
+            dydx_val = (self.y_list[i] - self.y_list[i-1]) / seg_len
+            
+        # Now handle extrapolation / boundary conditions
+        # Lower bound extrapolation
+        below_idx = x_np < self.x_list[0]
+        if self.lower_extrap: # Linear extrapolation from the first segment
+            if _eval:
+                y[below_idx] = self.y_list[0] + (x_np[below_idx] - self.x_list[0]) * (
+                    (self.y_list[1] - self.y_list[0]) / (self.x_list[1] - self.x_list[0])
+                )
+            if _Der:
+                dydx[below_idx] = (self.y_list[1] - self.y_list[0]) / (self.x_list[1] - self.x_list[0])
+        else: # No lower extrapolation, set to NaN (already done by initialization)
+            pass
+
+        # Upper bound extrapolation
+        above_idx = x_np > self.x_list[self.x_n-1]
+        if self.decay_extrap:
+            x_temp = x_np[above_idx] - self.x_list[self.x_n-1]
+            if _eval:
+                y[above_idx] = (
+                    self.intercept_limit + self.slope_limit * x_np[above_idx]
+                    - self.decay_extrap_A * np.exp(-self.decay_extrap_B * x_temp)
+                )
+            if _Der:
+                dydx[above_idx] = (
+                    self.slope_limit
+                    + self.decay_extrap_B * self.decay_extrap_A * np.exp(-self.decay_extrap_B * x_temp)
+                )
+        else: # Linear extrapolation from the last segment
+            if _eval:
+                 y[above_idx] = self.y_list[self.x_n-1] + (x_np[above_idx] - self.x_list[self.x_n-1]) * (
+                    (self.y_list[self.x_n-1] - self.y_list[self.x_n-2]) / (self.x_list[self.x_n-1] - self.x_list[self.x_n-2])
+                )
+            if _Der:
+                dydx[above_idx] = (self.y_list[self.x_n-1] - self.y_list[self.x_n-2]) / (self.x_list[self.x_n-1] - self.x_list[self.x_n-2])
+
+        # Assign interpolated values for points within segments (not extrapolated)
+        # This overwrites NaNs for these points but respects extrapolation results
+        in_bounds_idx = np.logical_not(np.logical_or(below_idx, above_idx))
+        if _eval:
+            y[in_bounds_idx] = y_val[in_bounds_idx]
+        if _Der:
+            dydx[in_bounds_idx] = dydx_val[in_bounds_idx]
+            
+        output = []
+        if _eval: output.append(y)
+        if _Der: output.append(dydx)
+        return output
 
     def _evalOrDer(self, x, _eval, _Der):
         """
@@ -802,8 +940,8 @@ class LinearInterp(HARKinterpolator1D):
 
         Parameters
         ----------
-        x_list : scalar or np.array
-            Set of points where we want to evlauate the interpolated function and/or its derivative..
+        x : scalar or np.array
+            Set of points where we want to evaluate the interpolated function and/or its derivative.
         _eval : boolean
             Indicator for whether to evalute the level of the interpolated function.
         _Der : boolean
@@ -813,55 +951,32 @@ class LinearInterp(HARKinterpolator1D):
         -------
         A list including the level and/or derivative of the interpolated function where requested.
         """
+        # Ensure x is a numpy array for Numba compatibility if it's called directly
+        x_np = np.asarray(x)
 
-        i = np.maximum(np.searchsorted(self.x_list[:-1], x), 1)
-        alpha = (x - self.x_list[i - 1]) / (self.x_list[i] - self.x_list[i - 1])
-
-        if _eval:
-            y = (1.0 - alpha) * self.y_list[i - 1] + alpha * self.y_list[i]
-        if _Der:
-            dydx = (self.y_list[i] - self.y_list[i - 1]) / (
-                self.x_list[i] - self.x_list[i - 1]
+        if HAS_NUMBA and _numba_linear_interp_eval_or_der_jitted is not None and self.x_n > 0:
+            # Numba kernel expects x to be 1D array.
+            # The HARKinterpolator1D wrapper already flattens and reshapes.
+            y_out, dydx_out = _numba_linear_interp_eval_or_der_jitted(
+                self.x_list, self.y_list, x_np.flatten(), # Pass flattened x
+                self.lower_extrap,
+                self.decay_extrap,
+                self.decay_extrap_A, self.decay_extrap_B,
+                self.intercept_limit, self.slope_limit,
+                _eval, _Der
             )
-
-        if not self.lower_extrap:
-            below_lower_bound = x < self.x_list[0]
-
+            
+            original_shape = x_np.shape # Preserve original shape to reshape results
+            output = []
             if _eval:
-                y[below_lower_bound] = np.nan
+                output.append(y_out.reshape(original_shape) if y_out is not None else None)
             if _Der:
-                dydx[below_lower_bound] = np.nan
+                output.append(dydx_out.reshape(original_shape) if dydx_out is not None else None)
+            return output
+        else:
+            # Fallback to pure Python version
+            return self._pure_python_eval_or_der(x_np, _eval, _Der)
 
-        if self.decay_extrap:
-            above_upper_bound = x > self.x_list[-1]
-            x_temp = x[above_upper_bound] - self.x_list[-1]
-
-            if _eval:
-                y[above_upper_bound] = (
-                    self.intercept_limit
-                    + self.slope_limit * x[above_upper_bound]
-                    - self.decay_extrap_A * np.exp(-self.decay_extrap_B * x_temp)
-                )
-
-            if _Der:
-                dydx[above_upper_bound] = (
-                    self.slope_limit
-                    + self.decay_extrap_B
-                    * self.decay_extrap_A
-                    * np.exp(-self.decay_extrap_B * x_temp)
-                )
-
-        output = []
-        if _eval:
-            output += [
-                y,
-            ]
-        if _Der:
-            output += [
-                dydx,
-            ]
-
-        return output
 
     def _evaluate(self, x, return_indices=False):
         """
@@ -885,6 +1000,159 @@ class LinearInterp(HARKinterpolator1D):
         y, dydx = self._evalOrDer(x, True, True)
 
         return y, dydx
+
+
+# Define the Numba kernel outside the class, as a standalone function
+# This function will be jitted if Numba is available.
+def _numba_linear_interp_eval_or_der(
+    x_list, y_list, x_eval, 
+    lower_extrap, decay_extrap,
+    decay_extrap_A, decay_extrap_B, 
+    intercept_limit, slope_limit,
+    _eval, _Der
+):
+    # Prepare output arrays. Numba works best with pre-allocated arrays.
+    # x_eval is already flattened by the caller HARKinterpolator1D wrapper.
+    y_results = np.empty_like(x_eval) if _eval else np.empty(0, dtype=x_eval.dtype) 
+    dydx_results = np.empty_like(x_eval) if _Der else np.empty(0, dtype=x_eval.dtype)
+    if _eval: y_results[:] = np.nan
+    if _Der: dydx_results[:] = np.nan
+
+    x_n = x_list.shape[0]
+
+    if x_n == 0:
+        return y_results, dydx_results # Returns empty/NaN arrays
+
+    if x_n == 1: # Handle single-point grid case
+        if _eval:
+            y_results[:] = y_list[0]
+        if _Der:
+            dydx_results[:] = 0.0
+        return y_results, dydx_results
+
+    # Main loop for each point in x_eval
+    for k in range(x_eval.shape[0]):
+        x_val = x_eval[k]
+        
+        # Find segment for x_val
+        # Equivalent of np.searchsorted(x_list, x_val, side='left')
+        # Numba supports np.searchsorted directly on arrays.
+        # We adjust i to be the index of the *right* grid point of the segment.
+        # So, for x in [x_list[j-1], x_list[j]], i should be j.
+        i = np.searchsorted(x_list, x_val, side='left')
+        
+        # Boundary conditions for i
+        if i == 0: # x_val < x_list[0] (or x_val == x_list[0] if x_list[0] is the smallest)
+            idx0, idx1 = 0, 1
+        elif i == x_n: # x_val >= x_list[x_n-1]
+            idx0, idx1 = x_n - 2, x_n - 1
+        else: # x_list[i-1] <= x_val < x_list[i]
+            idx0, idx1 = i - 1, i
+        
+        x0, x1 = x_list[idx0], x_list[idx1]
+        y0, y1 = y_list[idx0], y_list[idx1]
+        
+        seg_len = x1 - x0
+        # Avoid division by zero if grid points are not unique, though x_list should be strictly increasing.
+        # Numba handles division by zero by producing inf or nan, which is often acceptable.
+        # However, for alpha calculation, if seg_len is 0 and x_val == x0, alpha could be 0/0 -> nan.
+        # If x_val == x0 == x1, then alpha is nan. If y0 == y1, y is y0. If y0 != y1, it's a step, interp is ill-defined here.
+        # For simplicity, assume x_list is strictly increasing.
+        
+        # Lower extrapolation
+        if x_val < x_list[0]:
+            if lower_extrap:
+                # Linear extrapolation using the first segment's slope
+                slope0 = (y_list[1] - y_list[0]) / (x_list[1] - x_list[0])
+                if _eval:
+                    y_results[k] = y_list[0] + (x_val - x_list[0]) * slope0
+                if _Der:
+                    dydx_results[k] = slope0
+            # else, it remains NaN (already initialized)
+            continue # Move to next x_val
+
+        # Upper extrapolation
+        elif x_val > x_list[x_n-1]:
+            if decay_extrap:
+                x_temp = x_val - x_list[x_n-1]
+                if _eval:
+                    y_results[k] = (
+                        intercept_limit + slope_limit * x_val
+                        - decay_extrap_A * np.exp(-decay_extrap_B * x_temp)
+                    )
+                if _Der:
+                    dydx_results[k] = (
+                        slope_limit + decay_extrap_B * decay_extrap_A * np.exp(-decay_extrap_B * x_temp)
+                    )
+            else: # Linear extrapolation using the last segment's slope
+                slopen_1 = (y_list[x_n-1] - y_list[x_n-2]) / (x_list[x_n-1] - x_list[x_n-2])
+                if _eval:
+                    y_results[k] = y_list[x_n-1] + (x_val - x_list[x_n-1]) * slopen_1
+                if _Der:
+                    dydx_results[k] = slopen_1
+            continue # Move to next x_val
+
+        # Interpolation within grid segments
+        # Correct segment for interpolation found by searchsorted: x_list[i-1] <= x_val < x_list[i]
+        # So, idx0 = i-1, idx1 = i.
+        # If x_val == x_list[x_n-1], searchsorted(side='left') gives x_n.
+        # We need to handle this edge case to use the last valid segment.
+        if x_val == x_list[x_n-1]: # Exactly on the last grid point
+             idx0, idx1 = x_n-2, x_n-1 # Use the last segment
+        else: # Standard case: x_list[i-1] <= x_val < x_list[i]
+            # i from searchsorted(side='left') is such that x_list[i-1] <= x_val < x_list[i]
+            # So, the segment is [x_list[i-1], x_list[i]]
+            # We need to ensure i is at least 1.
+            # If x_val == x_list[0], searchsorted gives 0. We need i=1 for segment [0,1].
+            # Correct i from searchsorted: if x_val is on a grid point x_list[j],
+            # searchsorted(side='left') gives j. We want segment [j, j+1] or [j-1,j].
+            # Let's use the i from earlier clip: i = np.clip(np.searchsorted(x_list, x_val, side='left'), 1, x_n -1)
+            # This i is the *index of the right point of the segment*. So segment is [i-1, i].
+            # This was how `i` was calculated in the original pure python version after the np.maximum.
+            # Let's recalculate `i` robustly for interpolation phase
+            # `i_search` is the insertion point.
+            i_search = np.searchsorted(x_list, x_val, side='right') # Find where x_val would be inserted to maintain order
+                                                                    # if x_val is on a grid point, it gives index *after* it.
+            # Correct i to be the index of the right grid point of the segment [x_list[i-1], x_list[i]]
+            # This means x_list[i-1] <= x_val <= x_list[i]
+            if i_search == 0: # Should be handled by lower_extrap
+                 idx_interp_right = 1
+            elif i_search == x_n : # x_val is either on last point or beyond
+                 idx_interp_right = x_n -1
+            else: # 0 < i_search < x_n
+                 idx_interp_right = i_search
+
+            idx0, idx1 = idx_interp_right - 1, idx_interp_right
+            x0_interp, x1_interp = x_list[idx0], x_list[idx1]
+            y0_interp, y1_interp = y_list[idx0], y_list[idx1]
+            seg_len_interp = x1_interp - x0_interp
+            
+            if seg_len_interp == 0: # Should not happen if x_list is strictly increasing
+                alpha = 0.0 # Or handle as error/specific value
+            else:
+                alpha = (x_val - x0_interp) / seg_len_interp
+            
+            # Ensure alpha is within [0,1] for safety, though it should be by logic.
+            alpha = min(max(alpha, 0.0), 1.0)
+
+            if _eval:
+                y_results[k] = (1.0 - alpha) * y0_interp + alpha * y1_interp
+            if _Der:
+                if seg_len_interp == 0:
+                    dydx_results[k] = np.nan # Or some other indicator of undefined derivative
+                else:
+                    dydx_results[k] = (y1_interp - y0_interp) / seg_len_interp
+            
+    return y_results, dydx_results
+
+
+# Conditionally JIT the Numba kernel
+if HAS_NUMBA:
+    _numba_linear_interp_eval_or_der_jitted = njit(_numba_linear_interp_eval_or_der)
+else:
+    # If Numba is not available, _numba_linear_interp_eval_or_der_jitted will be None.
+    # The dispatcher in _evalOrDer will then call the pure Python version.
+    _numba_linear_interp_eval_or_der_jitted = None
 
 
 class CubicInterp(HARKinterpolator1D):
