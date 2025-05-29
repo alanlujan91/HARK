@@ -21,6 +21,9 @@ __all__ = [
     "expected",
     "Uniform",
     "MarkovProcess",
+    "MarkovChain",
+    "LabeledMarkovChain",
+    "create_markov_chain_from_tauchen",
     "add_discrete_outcome_constant_mean",
     "make_tauchen_ar1",
 ]
@@ -42,6 +45,11 @@ from HARK.distributions.discrete import (
     Bernoulli,
     DiscreteDistribution,
     DiscreteDistributionLabeled,
+)
+from HARK.distributions.markov import (
+    MarkovChain,
+    LabeledMarkovChain,
+    create_markov_chain_from_tauchen,
 )
 from HARK.distributions.multivariate import MultivariateLogNormal, MultivariateNormal
 from HARK.distributions.utils import (
